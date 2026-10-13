@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 
 Item {
     id: root
@@ -54,22 +53,30 @@ Item {
         resetWorld()
         phase = "playing"
         vy = jumpV
+        root.forceActiveFocus()
     }
 
     function step() {
-        if (phase !== "playing") return
+        if (phase !== "playing")
+            return
 
-        if (leftHeld) vx -= moveA
-        if (rightHeld) vx += moveA
+        if (leftHeld)
+            vx -= moveA
+        if (rightHeld)
+            vx += moveA
         vx *= friction
-        if (vx > maxVx) vx = maxVx
-        if (vx < -maxVx) vx = -maxVx
+        if (vx > maxVx)
+            vx = maxVx
+        if (vx < -maxVx)
+            vx = -maxVx
         vy += gravity
         px += vx
         py += vy
 
-        if (px < -playerSize) px = worldW
-        if (px > worldW) px = -playerSize
+        if (px < -playerSize)
+            px = worldW
+        if (px > worldW)
+            px = -playerSize
 
         if (vy > 0) {
             for (var i = 0; i < platforms.length; i++) {
@@ -85,35 +92,42 @@ Item {
         }
 
         var worldY = cam + (worldH - py)
-        if (worldY / 10 > maxHeight) maxHeight = worldY / 10
+        if (worldY / 10 > maxHeight)
+            maxHeight = worldY / 10
         score = Math.floor(maxHeight)
 
         var targetCam = Math.max(0, py - worldH * 0.45)
         if (targetCam < cam) {
             var dy = cam - targetCam
             cam = targetCam
-            for (var j = 0; j < platforms.length; j++) platforms[j].y += dy
+            for (var j = 0; j < platforms.length; j++)
+                platforms[j].y += dy
             py += dy
         }
 
         if (maxHeight > 20) {
             var rise = Math.min(1.1, 0.15 + maxHeight / 800)
             cam -= rise
-            for (var k = 0; k < platforms.length; k++) platforms[k].y += rise
+            for (var k = 0; k < platforms.length; k++)
+                platforms[k].y += rise
             py += rise
         }
 
         platforms = platforms.filter(function (p) { return p.y < worldH + 40 })
         while (platforms.length < 14) {
             var top = platforms[0].y
-            for (var t = 1; t < platforms.length; t++) if (platforms[t].y < top) top = platforms[t].y
+            for (var t = 1; t < platforms.length; t++) {
+                if (platforms[t].y < top)
+                    top = platforms[t].y
+            }
             platforms.push(randomPlatform(top - (70 + Math.random() * 40)))
         }
         platformsChanged()
 
         if (py > worldH + 40) {
             phase = "over"
-            if (score > best) best = score
+            if (score > best)
+                best = score
             root.fell(score)
         }
         canvas.requestPaint()
@@ -122,16 +136,23 @@ Item {
     Component.onCompleted: resetWorld()
 
     focus: true
+    activeFocusOnTab: true
     Keys.onPressed: function (e) {
-        if (e.key === Qt.Key_Left || e.key === Qt.Key_A) leftHeld = true
-        if (e.key === Qt.Key_Right || e.key === Qt.Key_D) rightHeld = true
+        if (e.key === Qt.Key_Left || e.key === Qt.Key_A)
+            leftHeld = true
+        if (e.key === Qt.Key_Right || e.key === Qt.Key_D)
+            rightHeld = true
         if (e.key === Qt.Key_Space || e.key === Qt.Key_Up || e.key === Qt.Key_W) {
-            if (phase === "ready" || phase === "over") startGame()
+            if (phase === "ready" || phase === "over")
+                startGame()
+            e.accepted = true
         }
     }
     Keys.onReleased: function (e) {
-        if (e.key === Qt.Key_Left || e.key === Qt.Key_A) leftHeld = false
-        if (e.key === Qt.Key_Right || e.key === Qt.Key_D) rightHeld = false
+        if (e.key === Qt.Key_Left || e.key === Qt.Key_A)
+            leftHeld = false
+        if (e.key === Qt.Key_Right || e.key === Qt.Key_D)
+            rightHeld = false
     }
 
     Timer {
@@ -147,9 +168,18 @@ Item {
         color: "#5f7881"
         clip: true
 
+        // Focus grab sits UNDER the overlay/button so it cannot steal clicks.
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onPressed: root.forceActiveFocus()
+        }
+
         Canvas {
             id: canvas
             anchors.fill: parent
+            // Let presses fall through to the focus MouseArea / overlay button.
+            enabled: false
             onPaint: {
                 var ctx = getContext("2d")
                 var sx = width / root.worldW
@@ -163,13 +193,12 @@ Item {
                 ctx.fillRect(0, 0, root.worldW, root.worldH)
 
                 ctx.fillStyle = "rgba(255,255,255,0.04)"
-                for (var x = 0; x < root.worldW; x += 48) ctx.fillRect(x, 0, 1, root.worldH)
+                for (var x = 0; x < root.worldW; x += 48)
+                    ctx.fillRect(x, 0, 1, root.worldH)
 
                 for (var i = 0; i < root.platforms.length; i++) {
                     var p = root.platforms[i]
                     ctx.fillStyle = "#f7fafb"
-                    ctx.beginPath()
-                    // simple rounded-ish rect
                     ctx.fillRect(p.x, p.y, p.w, 10)
                 }
             }
@@ -191,6 +220,7 @@ Item {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.margins: 12
+            z: 1
             Text {
                 text: "HEIGHT " + root.score
                 color: "white"
@@ -206,14 +236,18 @@ Item {
             }
         }
 
+        // Ready / game-over overlay — above focus MouseArea so Play/Again works.
         Rectangle {
             anchors.fill: parent
+            z: 2
             color: "#1c2a2f6b"
             visible: root.phase !== "playing"
+
             Column {
                 anchors.centerIn: parent
                 spacing: 12
                 width: parent.width - 48
+
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.phase === "ready" ? "Logos Tower" : ("Fell at " + root.score)
@@ -230,26 +264,28 @@ Item {
                           ? "Jump the rising platforms. ← → or A D. Space to start."
                           : "Height is signed before it hits the board."
                 }
-                Button {
+
+                // Forumer-style button (Rectangle + MouseArea), not Controls Button.
+                Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: root.phase === "ready" ? "Play" : "Again"
-                    onClicked: root.startGame()
-                    background: Rectangle { radius: 16; color: "white"; implicitHeight: 36; implicitWidth: 96 }
-                    contentItem: Text {
-                        text: parent.text
+                    width: 96
+                    height: 36
+                    radius: 16
+                    color: "white"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.phase === "ready" ? "Play" : "Again"
                         color: "#4F6670"
                         font.bold: true
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.startGame()
                     }
                 }
             }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            onPressed: root.forceActiveFocus()
         }
     }
 }

@@ -4,18 +4,17 @@ import QtQuick.Layouts
 
 Item {
     id: root
-    // Match working Basecamp ui_qml modules (e.g. storage_ui): give the
-    // embedded QQuickWidget a usable preferred size when first mounted.
+    // Preferred size for Basecamp's QQuickWidget host (storage_ui pattern).
     implicitWidth: 420
     implicitHeight: 720
 
     readonly property var backend: logos.module("logos_tower")
     property bool ready: false
-    property string tab: "play" // play | login | board
+    // play | login | board — do not use object key "id" (reserved in QML).
+    property string tab: "play"
 
     readonly property color teal: "#6A838B"
     readonly property color tealDeep: "#4F6670"
-    readonly property color paper: "#F4F7F8"
 
     Connections {
         target: logos
@@ -44,9 +43,12 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
+            z: 2
+
             Image {
                 source: "lambda.png"
-                width: 28; height: 28
+                Layout.preferredWidth: 28
+                Layout.preferredHeight: 28
                 fillMode: Image.PreserveAspectFit
                 smooth: true
             }
@@ -57,26 +59,38 @@ Item {
                 font.bold: true
             }
             Item { Layout.fillWidth: true }
+
+            // Forumer-style hit targets: Rectangle + MouseArea (not Controls Button
+            // with replaced background/contentItem, which can end up zero-sized).
             Repeater {
                 model: [
-                    { id: "play", label: "Play" },
-                    { id: "login", label: "Login" },
-                    { id: "board", label: "Board" }
+                    { key: "play", label: "Play" },
+                    { key: "login", label: "Login" },
+                    { key: "board", label: "Board" }
                 ]
-                delegate: Button {
-                    text: modelData.label
-                    flat: true
-                    onClicked: root.tab = modelData.id
-                    background: Rectangle {
-                        radius: 14
-                        color: root.tab === modelData.id ? Qt.rgba(1,1,1,0.22) : "transparent"
-                        border.color: root.tab === modelData.id ? Qt.rgba(1,1,1,0.35) : "transparent"
-                    }
-                    contentItem: Text {
-                        text: parent.text
+                delegate: Rectangle {
+                    required property var modelData
+                    readonly property bool selected: root.tab === modelData.key
+
+                    Layout.preferredHeight: 32
+                    Layout.preferredWidth: Math.max(64, label.implicitWidth + 28)
+                    radius: 14
+                    color: selected ? Qt.rgba(1, 1, 1, 0.22) : "transparent"
+                    border.width: selected ? 1 : 0
+                    border.color: Qt.rgba(1, 1, 1, 0.35)
+
+                    Text {
+                        id: label
+                        anchors.centerIn: parent
+                        text: modelData.label
                         color: "white"
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 13
+                        font.bold: selected
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.tab = modelData.key
                     }
                 }
             }
@@ -88,125 +102,170 @@ Item {
             color: "#ffd39a"
         }
 
-        // —— Play ——
-        Item {
-            visible: root.tab === "play"
+        // Exclusive pages — avoids invisible siblings eating layout/hit space.
+        StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            currentIndex: root.tab === "login" ? 1 : (root.tab === "board" ? 2 : 0)
 
-            GameCanvas {
-                id: game
-                anchors.centerIn: parent
-                width: Math.min(parent.width, 380)
-                height: Math.min(parent.height, 620)
-                onFell: function (h) {
-                    if (!root.ready) return
-                    logos.watch(backend.signAndSubmit(h), function () {}, function (err) {
-                        console.log("submit error", err)
-                    })
-                }
-            }
-        }
-
-        // —— Login ——
-        ColumnLayout {
-            visible: root.tab === "login"
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: 12
-
-            Text {
-                text: "Login"
-                color: "white"
-                font.pixelSize: 28
-                font.bold: true
-            }
-            Text {
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                color: Qt.rgba(1,1,1,0.82)
-                text: "Ed25519 persona seed stays in this Basecamp profile (QSettings). Scores are signed here with BLAKE2b PoW — the board never trusts a raw height."
-            }
-            Text {
-                text: "Persona: " + (backend ? backend.persona : "—")
-                color: "white"
-                font.pixelSize: 16
-                font.bold: true
-            }
-            TextField {
-                id: aliasField
-                Layout.fillWidth: true
-                placeholderText: "Display alias (optional)"
-                color: "white"
-                placeholderTextColor: Qt.rgba(1,1,1,0.5)
-                background: Rectangle {
-                    radius: 8
-                    color: Qt.rgba(1,1,1,0.12)
-                    border.color: Qt.rgba(1,1,1,0.28)
-                }
-            }
-            RowLayout {
-                spacing: 8
-                Button {
-                    text: "Save / create persona"
-                    onClicked: {
-                        if (!root.ready) return
-                        logos.watch(backend.ensurePersona(aliasField.text), function () {}, function () {})
-                    }
-                    background: Rectangle { radius: 16; color: "white" }
-                    contentItem: Text { text: parent.text; color: root.tealDeep; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; leftPadding: 12; rightPadding: 12 }
-                }
-                Button {
-                    text: "Log out"
-                    flat: true
-                    onClicked: {
-                        if (!root.ready) return
-                        logos.watch(backend.clearPersona(), function () {}, function () {})
-                    }
-                    contentItem: Text { text: parent.text; color: "white" }
-                }
-            }
-            Text {
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                color: Qt.rgba(1,1,1,0.75)
-                text: backend ? backend.message : ""
-            }
-            Item { Layout.fillHeight: true }
-        }
-
-        // —— Board ——
-        ColumnLayout {
-            visible: root.tab === "board"
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: 10
-
-            Text {
-                text: "Leaderboard"
-                color: "white"
-                font.pixelSize: 28
-                font.bold: true
-            }
-            Text {
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                color: Qt.rgba(1,1,1,0.8)
-                text: "Best verified signed heights on this device. Envelope: Ed25519 + BLAKE2b PoW (12 bits)."
-            }
-            ListView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+            // —— Play ——
+            Item {
                 clip: true
-                model: {
-                    try { return JSON.parse(backend ? backend.board : "[]") } catch (e) { return [] }
+
+                GameCanvas {
+                    id: game
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width, 380)
+                    height: Math.min(parent.height, 620)
+                    onFell: function (h) {
+                        if (!root.ready)
+                            return
+                        logos.watch(backend.signAndSubmit(h), function () {}, function (err) {
+                            console.log("submit error", err)
+                        })
+                    }
                 }
-                delegate: RowLayout {
-                    width: ListView.view.width
-                    spacing: 12
-                    Text { text: (index + 1); color: Qt.rgba(1,1,1,0.6); font.bold: true; Layout.preferredWidth: 28 }
-                    Text { text: modelData.author; color: "white"; Layout.fillWidth: true; elide: Text.ElideRight }
-                    Text { text: modelData.height; color: "white"; font.bold: true }
+            }
+
+            // —— Login ——
+            ColumnLayout {
+                spacing: 12
+
+                Text {
+                    text: "Login"
+                    color: "white"
+                    font.pixelSize: 28
+                    font.bold: true
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: Qt.rgba(1, 1, 1, 0.82)
+                    text: "Ed25519 persona seed stays in this Basecamp profile (QSettings). Scores are signed here with BLAKE2b PoW — the board never trusts a raw height."
+                }
+                Text {
+                    text: "Persona: " + (backend ? backend.persona : "—")
+                    color: "white"
+                    font.pixelSize: 16
+                    font.bold: true
+                }
+                TextField {
+                    id: aliasField
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 40
+                    placeholderText: "Display alias (optional)"
+                    color: "white"
+                    placeholderTextColor: Qt.rgba(1, 1, 1, 0.5)
+                    background: Rectangle {
+                        radius: 8
+                        color: Qt.rgba(1, 1, 1, 0.12)
+                        border.color: Qt.rgba(1, 1, 1, 0.28)
+                    }
+                }
+                RowLayout {
+                    spacing: 8
+
+                    Rectangle {
+                        Layout.preferredHeight: 36
+                        Layout.preferredWidth: saveLabel.implicitWidth + 28
+                        radius: 16
+                        color: "white"
+                        opacity: root.ready ? 1 : 0.5
+
+                        Text {
+                            id: saveLabel
+                            anchors.centerIn: parent
+                            text: "Save / create persona"
+                            color: root.tealDeep
+                            font.bold: true
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: root.ready
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: logos.watch(backend.ensurePersona(aliasField.text), function () {}, function () {})
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.preferredHeight: 36
+                        Layout.preferredWidth: logoutLabel.implicitWidth + 20
+                        radius: 16
+                        color: "transparent"
+
+                        Text {
+                            id: logoutLabel
+                            anchors.centerIn: parent
+                            text: "Log out"
+                            color: "white"
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: root.ready
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: logos.watch(backend.clearPersona(), function () {}, function () {})
+                        }
+                    }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: Qt.rgba(1, 1, 1, 0.75)
+                    text: backend ? backend.message : ""
+                }
+                Item { Layout.fillHeight: true }
+            }
+
+            // —— Board ——
+            ColumnLayout {
+                spacing: 10
+
+                Text {
+                    text: "Leaderboard"
+                    color: "white"
+                    font.pixelSize: 28
+                    font.bold: true
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: Qt.rgba(1, 1, 1, 0.8)
+                    text: "Best verified signed heights on this device. Envelope: Ed25519 + BLAKE2b PoW (12 bits)."
+                }
+                ListView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    model: {
+                        try {
+                            return JSON.parse(backend ? backend.board : "[]")
+                        } catch (e) {
+                            return []
+                        }
+                    }
+                    delegate: RowLayout {
+                        required property int index
+                        required property var modelData
+                        width: ListView.view.width
+                        spacing: 12
+                        Text {
+                            text: (index + 1)
+                            color: Qt.rgba(1, 1, 1, 0.6)
+                            font.bold: true
+                            Layout.preferredWidth: 28
+                        }
+                        Text {
+                            text: modelData.author
+                            color: "white"
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            text: modelData.height
+                            color: "white"
+                            font.bold: true
+                        }
+                    }
                 }
             }
         }
