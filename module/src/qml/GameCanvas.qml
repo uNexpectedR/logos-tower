@@ -32,6 +32,7 @@ Item {
     property real vy: 0
     property real cam: 0
     property real maxHeight: 0
+    property int runFrames: 0
     property var platforms: []
     property bool leftHeld: false
     property bool rightHeld: false
@@ -80,16 +81,34 @@ Item {
         return { x: x, w: w }
     }
 
-    // Shift world so the λ never leaves the top of the view (or chrome).
-    function keepPlayerInView() {
-        var topLimit = topSafe + Math.max(36, worldH * 0.10)
-        if (py >= topLimit)
+    // Scroll the world upward by `amount` (player stays framed; height accumulates).
+    function scrollWorld(amount) {
+        if (amount <= 0)
             return
-        var shift = topLimit - py
-        py += shift
+        py += amount
         for (var i = 0; i < platforms.length; i++)
-            platforms[i].y += shift
-        cam -= shift
+            platforms[i].y += amount
+        cam -= amount
+    }
+
+    // Icy Tower: when the λ climbs toward/above the top, fast-forward the camera up to them.
+    function followPlayerUp() {
+        // Keep the player around the upper third — full catch-up each frame (= snap-scroll).
+        var followLine = topSafe + worldH * 0.30
+        if (py < followLine)
+            scrollWorld(followLine - py)
+        // Hard ceiling: never allow the sprite above the chrome + small pad.
+        var topLimit = topSafe + Math.max(28, worldH * 0.06)
+        if (py < topLimit)
+            scrollWorld(topLimit - py)
+    }
+
+    // Rising floor / pace — accelerates with height and run time (Icy Tower feel).
+    function floorRiseSpeed() {
+        var d = difficulty()
+        var t = Math.min(1, runFrames / (60 * 90)) // ~90s to full time ramp
+        // Base pace climbs quickly; height and time both push harder.
+        return Math.min(2.4, 0.35 + d * 1.15 + t * 0.7 + maxHeight / 550)
     }
 
     function syncWorldSize() {
@@ -123,6 +142,7 @@ Item {
         vy = 0
         cam = 0
         maxHeight = 0
+        runFrames = 0
         var groundW = Math.min(laneWidth() * 0.45, 200)
         var ground = clampPlatformInLane(worldW / 2 - groundW / 2, groundW)
         platforms = [{
@@ -219,39 +239,27 @@ Item {
             vx = maxVx
         if (vx < -maxVx)
             vx = -maxVx
+        runFrames++
         vy += gravity
         px += vx
         py += vy
         clampPlayerX()
         tryLand()
-        // After jump/land: pull the camera so the λ never flies off the top.
-        keepPlayerInView()
+
+        // Camera first: chase the player up (Icy Tower fast-forward), then rising floor.
+        followPlayerUp()
 
         var worldY = cam + (worldH - py)
         if (worldY / 10 > maxHeight)
             maxHeight = worldY / 10
         score = Math.floor(maxHeight)
 
-        // Follow the player upward when they climb into the upper half.
-        var followLine = worldH * 0.42
-        if (py < followLine) {
-            var dy = followLine - py
-            py += dy
-            for (var j = 0; j < platforms.length; j++)
-                platforms[j].y += dy
-            cam -= dy
-        }
+        // Accelerating floor / pace — starts once you're off the ground a bit.
+        if (maxHeight > 8)
+            scrollWorld(floorRiseSpeed())
 
-        // Rising floor — faster with height, still under a fair jump step.
-        if (maxHeight > 15) {
-            var d = difficulty()
-            var rise = Math.min(1.75, 0.28 + d * 0.9 + maxHeight / 700)
-            cam -= rise
-            for (var k = 0; k < platforms.length; k++)
-                platforms[k].y += rise
-            py += rise
-            keepPlayerInView()
-        }
+        // Re-frame after floor rise so a big scroll never leaves the λ above the view.
+        followPlayerUp()
 
         platforms = platforms.filter(function (p) { return p.y < worldH + 80 })
         var minCount = Math.max(18, Math.round(worldH / 50))
