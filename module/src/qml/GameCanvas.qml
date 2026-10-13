@@ -103,8 +103,11 @@ Item {
         return pL - nR
     }
 
+    // Classic Icy Tower curve: gentle open, spicy late. Near-full ~height 360.
     function difficulty() {
-        return Math.min(1, maxHeight / 140)
+        if (maxHeight < 20)
+            return Math.min(0.12, maxHeight / 160)
+        return Math.min(1, 0.12 + (maxHeight - 20) / 340)
     }
 
     // Platforms live only in the center 60% (20% empty gutter each side).
@@ -143,12 +146,13 @@ Item {
             scrollWorld(topLimit - py)
     }
 
-    // Rising floor — starts immediately and ramps hard so long hangs get eaten.
+    // Rising floor — slow creep at open, authentic late-game rush (classic IT pacing).
     function floorRiseSpeed() {
         var d = difficulty()
-        var t = Math.min(1, runFrames / (60 * 40)) // ~40s to full time ramp
-        // Early pressure (~1.1), mid ~2.4, late cap ~3.9 — outpace needs edge/combo.
-        return Math.min(3.9, 1.05 + d * 1.7 + t * 1.35 + maxHeight / 320)
+        // ~10s almost-idle, then ~100s to full time contribution.
+        var t = Math.min(1, Math.max(0, (runFrames - 60 * 10) / (60 * 100)))
+        // Open ~0.20–0.35, mid ~1.3–2.0, late cap ~3.7.
+        return Math.min(3.7, 0.20 + d * 1.85 + t * 1.15 + maxHeight / 480)
     }
 
     function syncWorldSize() {
@@ -229,30 +233,32 @@ Item {
 
     function pickKind(diff, index, stretch) {
         var r = Math.random()
-        if (index < 3 || diff < 0.18) {
-            if (r < 0.10)
+        // Opening tower: wide normal ledges only.
+        if (index < 6 || diff < 0.22) {
+            if (r < 0.08 && diff > 0.12)
                 return "narrow"
             return "normal"
         }
         // Stretch jumps stay on solid footing (no movers/crumbs on the hard arc).
         if (stretch) {
-            if (r < 0.18)
+            if (r < 0.16)
                 return "narrow"
-            if (r < 0.30)
+            if (r < 0.28)
                 return "spring"
-            if (r < 0.42)
+            if (r < 0.38)
                 return "ice"
             return "normal"
         }
-        if (r < 0.14 + diff * 0.06)
+        // Obstacle variety scales with difficulty — scarce early, common late.
+        if (r < 0.06 + diff * 0.12)
             return "moving"
-        if (r < 0.24 + diff * 0.05)
+        if (r < 0.12 + diff * 0.10)
             return "crumb"
-        if (r < 0.38 + diff * 0.04)
+        if (r < 0.22 + diff * 0.12)
             return "ice"
-        if (r < 0.48)
+        if (r < 0.30 + diff * 0.10)
             return "spring"
-        if (r < 0.68)
+        if (r < 0.42 + diff * 0.18)
             return "narrow"
         return "normal"
     }
@@ -276,7 +282,8 @@ Item {
         platforms = [makePlatform(ground.x, worldH - Math.max(48, worldH * 0.08), ground.w, "normal")]
         var prev = platforms[0]
         for (var i = 0; i < 22; i++) {
-            var d = i < 3 ? 0.10 : Math.max(0.35, difficulty())
+            // Seed a gentle on-ramp by index — do not force mid-game difficulty at start.
+            var d = Math.min(0.55, 0.04 + i * 0.018)
             var next = nextReachablePlatform(prev, d, i)
             platforms.push(next)
             prev = next
@@ -288,13 +295,15 @@ Item {
     // Place one landable ledge. Stretch uses edgeJumpV0 only (never combo).
     // Retries until horiz+vert clearance passes; falls back to a safe hop.
     function nextReachablePlatform(prev, diff, index) {
-        var stretch = Math.random() < (0.22 + diff * 0.40)
+        // Stretch almost absent at open; common only once difficulty ramps.
+        var stretchChance = Math.max(0, diff - 0.15) * 0.55
+        var stretch = Math.random() < stretchChance
         var vJump = stretch ? edgeJumpV0() : jumpV
         var peak = maxJumpHeightFrom(vJump)
         var peakFrac = stretch ? gapPeakFracEdge : gapPeakFracBase
-        // Keep gaps in a band the chosen skill can clear — not RNG death.
-        var maxGapY = peak * peakFrac
-        var minGapY = peak * (stretch ? 0.55 : 0.40) * (0.85 + 0.15 * diff)
+        // Early gaps sit low in the envelope; late gaps push the skill band.
+        var maxGapY = peak * (stretch ? peakFrac : (0.55 + 0.23 * diff))
+        var minGapY = peak * (stretch ? (0.48 + 0.10 * diff) : (0.28 + 0.14 * diff))
         if (minGapY > maxGapY - 12)
             minGapY = maxGapY - 12
 
@@ -312,16 +321,18 @@ Item {
                 gapY = minGapY + (0.55 + Math.random() * 0.45) * (maxGapY - minGapY)
 
             var budget = maxHorizTravel(gapY, vJump)
+            // Wider ledges early; narrows as difficulty rises.
+            var wideBonus = Math.max(0, 0.22 - diff) * laneWidth()
             if (kind === "narrow")
-                w = Math.max(48, laneWidth() * (0.09 - 0.015 * diff)) + Math.random() * Math.max(8, laneWidth() * 0.04)
+                w = Math.max(48, laneWidth() * (0.10 - 0.02 * diff)) + Math.random() * Math.max(8, laneWidth() * 0.04)
             else if (kind === "spring")
-                w = Math.max(64, laneWidth() * (0.13 - 0.02 * diff)) + Math.random() * Math.max(10, laneWidth() * 0.06)
+                w = Math.max(64, laneWidth() * (0.14 - 0.02 * diff)) + Math.random() * Math.max(10, laneWidth() * 0.06) + wideBonus * 0.35
             else
-                w = Math.max(62, laneWidth() * (0.13 - 0.025 * diff)) + Math.random() * Math.max(12, laneWidth() * 0.08)
+                w = Math.max(70, laneWidth() * (0.16 - 0.04 * diff)) + Math.random() * Math.max(12, laneWidth() * 0.09) + wideBonus
 
             var side = Math.random() < 0.5 ? -1 : 1
-            // Aim well inside the budget so clamp + width cannot strand the player.
-            var targetClear = budget * (0.35 + Math.random() * 0.50)
+            // Early hops stay close; later hops use more of the budget.
+            var targetClear = budget * ((0.18 + 0.20 * diff) + Math.random() * (0.35 + 0.20 * diff))
             var prevCx = prev.x + prev.w / 2
             var cx = prevCx + side * (targetClear + w / 2)
             var cand = clampPlatformInLane(cx - w / 2, w)
@@ -528,7 +539,7 @@ Item {
         })
 
         var minCount = Math.max(22, Math.round(worldH / 44))
-        var diff = Math.max(0.35, difficulty())
+        var diff = difficulty()
         while (platforms.length < minCount) {
             var prev = highestPlatform()
             if (!prev)
@@ -737,7 +748,7 @@ Item {
                     color: "#dfe8eb"
                     font.pixelSize: 15
                     text: root.phase === "ready"
-                          ? "The floor is rising — keep climbing. Edge jumps beat the long gaps. ← → or A D. Space to start."
+                          ? "Start easy — the floor and gaps ramp as you climb. Edge jumps beat the late tower. ← → or A D. Space to start."
                           : (root.bestCombo > 0
                              ? ("Best combo x" + root.bestCombo + ". Height is signed before it hits the board.")
                              : "Height is signed before it hits the board.")
