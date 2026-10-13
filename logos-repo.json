@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "name": "logos-tower",
   "displayName": "Logos Tower",
-  "description": "Logos Tower for Basecamp — install package logos_tower (vertical jumper, Ed25519 persona, signed scores).",
+  "description": "Logos Tower for Basecamp \u2014 install logos_tower (vertical jumper).",
   "homepage": "https://github.com/uNexpectedR/logos-tower",
-  "indexUrl": "https://raw.githubusercontent.com/uNexpectedR/logos-tower/cursor/logos-tower-558f/catalog/index.json",
+  "indexUrl": "https://github.com/uNexpectedR/logos-tower/releases/download/index/index.json",
   "trustedSigners": []
 }

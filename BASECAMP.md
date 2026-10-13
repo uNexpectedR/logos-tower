@@ -2,23 +2,34 @@
 
 ## Catalog URL
 
+Use the GitHub Releases catalog (not a raw branch URL):
+
 ```
-https://raw.githubusercontent.com/uNexpectedR/logos-tower/cursor/logos-tower-558f/logos-repo.json
+https://github.com/uNexpectedR/logos-tower/releases/download/index/logos-repo.json
+```
+
+`indexUrl` in that file points at:
+
+```
+https://github.com/uNexpectedR/logos-tower/releases/download/index/index.json
 ```
 
 ## Install steps
 
-1. Open **Logos Basecamp** (desktop).
+1. Open **Logos Basecamp** (desktop, linux-amd64).
 2. **Settings → Package Repositories** (or Package Manager → Add repository).
-3. Paste the catalog URL above → **Add**.
-4. Open **Package Manager**, find **Logos Tower** (`logos_tower`).
-5. **Install** → load/open from the sidebar (Apps).
+3. If you previously added the raw.githubusercontent.com catalog URL, remove it.
+4. Paste the Releases catalog URL above → **Add**.
+5. Refresh / reopen **Package Manager** (or Package Monitor).
+6. Find **Logos Tower** (`logos_tower`) under **Social** → **Install**.
+7. Open **Logos Tower** from the sidebar (Apps).
 
 | | |
 | --- | --- |
 | Package id | `logos_tower` |
 | Version | `0.1.0` |
-| Variant | `linux-amd64` |
+| Variant | `linux-amd64` only (this release) |
+| Category | `social` |
 | Release | https://github.com/uNexpectedR/logos-tower/releases/tag/logos_tower-v0.1.0 |
 
 After install, play from the Basecamp sidebar app **Logos Tower** (no separate play URL — it is an in-shell UI module).

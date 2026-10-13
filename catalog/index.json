@@ -1,21 +1,29 @@
 {
   "schemaVersion": 2,
   "repositoryName": "logos-tower",
-  "generatedAt": "2026-10-13T09:40:07Z",
+  "generatedAt": "2026-10-13T09:50:10Z",
   "packages": [
     {
       "name": "logos_tower",
       "versions": [
         {
-          "releasedAt": "2026-10-13T09:40:07Z",
+          "releasedAt": "2026-10-13T09:50:10Z",
           "publisherRef": "logos_tower-v0.1.0",
           "url": "https://github.com/uNexpectedR/logos-tower/releases/download/logos_tower-v0.1.0/logos_tower-0.1.0.lgx",
+          "urls": [
+            "https://github.com/uNexpectedR/logos-tower/releases/download/logos_tower-v0.1.0/logos_tower-0.1.0.lgx"
+          ],
           "size": 4157982,
           "sha256": "2afe47ad1b0cd65ffc6c18a7758341f7c05e91dc79ddfc6e4b2d999dc5bd6623",
           "rootHash": "dcf68daba1f3910716e8a09da7df6e0a7322faf4440932fd499e5f9c27ef8696",
+          "icon": {
+            "path": "ba1ee01b8114ea3686eac45e1d7e244b8e3d54adf2f284fb55948cfa87f2c631.png",
+            "sha256": "ba1ee01b8114ea3686eac45e1d7e244b8e3d54adf2f284fb55948cfa87f2c631",
+            "size": 7111
+          },
           "manifest": {
             "author": "",
-            "category": "games",
+            "category": "social",
             "dependencies": [],
             "description": "Vertical jumper with the Logos \u03bb. Ed25519 persona login and signed height scores (BLAKE2b PoW). Open source.",
             "display_name": "Logos Tower",

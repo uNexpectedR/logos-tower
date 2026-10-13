@@ -46,10 +46,10 @@ Muted slate-teal `#6A838B` + white λ (`public/logos-lambda.png`).
 
 ## Basecamp
 
-**Catalog URL** (Package Repositories):
+**Catalog URL** (Package Repositories) — GitHub Releases, not raw branch:
 
 ```
-https://raw.githubusercontent.com/uNexpectedR/logos-tower/cursor/logos-tower-558f/logos-repo.json
+https://github.com/uNexpectedR/logos-tower/releases/download/index/logos-repo.json
 ```
 
-Install package **`logos_tower` `0.1.0`**, then open **Logos Tower** from the Basecamp sidebar. Details and threat model: [BASECAMP.md](./BASECAMP.md).
+Install package **`logos_tower` `0.1.0`** (`linux-amd64`, category Social), then open **Logos Tower** from the Basecamp sidebar. Details and threat model: [BASECAMP.md](./BASECAMP.md).
