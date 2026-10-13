@@ -1,7 +1,7 @@
 {
   "name": "logos_tower",
   "display_name": "Logos Tower",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "ui_qml",
   "interface": "universal",
   "category": "social",
@@ -12,7 +12,9 @@
   "dependencies": [],
   "provides": [],
   "uses": [],
-  "codegen": { "rep": "src/logos_tower.rep" },
+  "codegen": {
+    "rep": "src/logos_tower.rep"
+  },
   "nix": {
     "packages": {
       "build": [],

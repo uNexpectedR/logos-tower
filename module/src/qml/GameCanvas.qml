@@ -15,17 +15,16 @@ Item {
     property int worldW: 720
     property int worldH: 900
 
-    // Icy Tower–style feel: strong jump, snappy air control, fair reach.
-    readonly property real gravity: 0.52
-    readonly property real jumpV: -14.2
-    readonly property real moveA: 0.95
-    readonly property real friction: 0.86
-    readonly property real maxVx: 9.0
+    // Icy Tower–style: fair but demanding — skill required, still landable.
+    readonly property real gravity: 0.54
+    readonly property real jumpV: -14.0
+    readonly property real moveA: 1.05
+    readonly property real friction: 0.85
+    readonly property real maxVx: 9.5
     readonly property int playerSize: 44
     readonly property int platformH: 14
-    // Landing forgiveness (px) so visually landable ledges register.
-    readonly property real landSlopY: 6
-    readonly property real landSlopX: 4
+    readonly property real landSlopY: 5
+    readonly property real landSlopX: 3
 
     property real px: 0
     property real py: 0
@@ -41,13 +40,11 @@ Item {
         return (jumpV * jumpV) / (2 * gravity)
     }
 
-    // Equilibrium horizontal speed while holding a direction (add then friction).
     function holdSpeed() {
         var s = (moveA * friction) / Math.max(0.001, 1 - friction)
         return Math.min(maxVx, s)
     }
 
-    // Frames in the air when jumping up by gapY (continuous approx).
     function airTimeForGap(gapY) {
         var v = -jumpV
         var peak = maxJumpHeight()
@@ -62,8 +59,37 @@ Item {
     }
 
     function difficulty() {
-        // 0 → early (easy), 1 → later (still capped fair).
-        return Math.min(1, maxHeight / 500)
+        // Ramps faster: spicy by ~height 220, capped fair at 1.
+        return Math.min(1, maxHeight / 220)
+    }
+
+    // Platforms live only in the center 60% (20% empty gutter each side).
+    function laneLeft() { return worldW * 0.20 }
+    function laneRight() { return worldW * 0.80 }
+    function laneWidth() { return worldW * 0.60 }
+
+    function clampPlatformInLane(x, w) {
+        var L = laneLeft()
+        var R = laneRight()
+        if (w > laneWidth())
+            w = laneWidth()
+        if (x < L)
+            x = L
+        if (x + w > R)
+            x = R - w
+        return { x: x, w: w }
+    }
+
+    // Shift world so the λ never leaves the top of the view (or chrome).
+    function keepPlayerInView() {
+        var topLimit = topSafe + Math.max(36, worldH * 0.10)
+        if (py >= topLimit)
+            return
+        var shift = topLimit - py
+        py += shift
+        for (var i = 0; i < platforms.length; i++)
+            platforms[i].y += shift
+        cam -= shift
     }
 
     function syncWorldSize() {
@@ -97,52 +123,53 @@ Item {
         vy = 0
         cam = 0
         maxHeight = 0
-        var groundW = Math.min(worldW * 0.32, 260)
+        var groundW = Math.min(laneWidth() * 0.45, 200)
+        var ground = clampPlatformInLane(worldW / 2 - groundW / 2, groundW)
         platforms = [{
-            x: worldW / 2 - groundW / 2,
+            x: ground.x,
             y: worldH - Math.max(48, worldH * 0.08),
-            w: groundW
+            w: ground.w
         }]
         var prev = platforms[0]
         for (var i = 0; i < 18; i++) {
-            prev = nextReachablePlatform(prev, i < 3 ? 0 : difficulty())
+            // First two steps are a short on-ramp; then full difficulty.
+            prev = nextReachablePlatform(prev, i < 2 ? 0.15 : Math.max(0.35, difficulty()))
             platforms.push(prev)
         }
         platformsChanged()
         canvas.requestPaint()
     }
 
-    // Place a platform reachable from `prev` with a normal jump (+ air steer).
+    // Reachable from `prev`, inside the center-60% lane, near jump envelope edge.
     function nextReachablePlatform(prev, diff) {
         var peak = maxJumpHeight()
-        // Vertical gap: always under ~70% of peak; early game even shorter.
-        var maxGapY = peak * (0.52 + 0.18 * diff)   // ~52–70% of peak
-        var minGapY = peak * (0.22 + 0.06 * diff)   // ~22–28%
-        var gapY = minGapY + Math.random() * (maxGapY - minGapY)
+        // Tighter vertical gaps — still under ~82% of peak so skilled jumps land.
+        var maxGapY = peak * (0.58 + 0.24 * diff)   // ~58–82%
+        var minGapY = peak * (0.38 + 0.14 * diff)   // ~38–52%
+        if (minGapY > maxGapY - 8)
+            minGapY = maxGapY - 8
+        // Prefer upper half of the band (harder average gap).
+        var gapY = minGapY + (0.45 + Math.random() * 0.55) * (maxGapY - minGapY)
 
         var airT = airTimeForGap(gapY)
         var hs = holdSpeed()
-        // Horizontal budget with margin for imperfect steering / rising floor.
-        var maxDx = hs * airT * (0.78 - 0.12 * diff)
+        // Tight horizontal budget — reachable with committed air steer.
+        var maxDx = hs * airT * (0.90 - 0.08 * diff)
+        // Never ask for a lateral jump wider than the play lane allows.
+        maxDx = Math.min(maxDx, laneWidth() * 0.85)
 
-        var minW = Math.max(100, worldW * 0.14)
-        var maxW = Math.max(minW + 24, worldW * (0.24 - 0.04 * diff))
+        var minW = Math.max(68, laneWidth() * (0.14 - 0.03 * diff))
+        var maxW = Math.max(minW + 14, laneWidth() * (0.28 - 0.06 * diff))
         var w = minW + Math.random() * (maxW - minW)
 
         var prevCx = prev.x + prev.w / 2
-        var dx = (Math.random() * 2 - 1) * maxDx
-        // Bias toward center early so the first climbs aren't edge-trapped.
-        if (diff < 0.25)
-            dx *= 0.7
+        // Bias toward larger lateral jumps (not tiny hops).
+        var side = Math.random() < 0.5 ? -1 : 1
+        var dx = side * (0.45 + Math.random() * 0.55) * maxDx
         var cx = prevCx + dx
-        var margin = Math.max(20, worldW * 0.025)
-        var x = cx - w / 2
-        if (x < margin)
-            x = margin
-        if (x + w > worldW - margin)
-            x = worldW - margin - w
+        var placed = clampPlatformInLane(cx - w / 2, w)
 
-        return { x: x, y: prev.y - gapY, w: w }
+        return { x: placed.x, y: prev.y - gapY, w: placed.w }
     }
 
     function startGame() {
@@ -197,33 +224,38 @@ Item {
         py += vy
         clampPlayerX()
         tryLand()
+        // After jump/land: pull the camera so the λ never flies off the top.
+        keepPlayerInView()
 
         var worldY = cam + (worldH - py)
         if (worldY / 10 > maxHeight)
             maxHeight = worldY / 10
         score = Math.floor(maxHeight)
 
-        var targetCam = Math.max(0, py - worldH * 0.48)
-        if (targetCam < cam) {
-            var dy = cam - targetCam
-            cam = targetCam
+        // Follow the player upward when they climb into the upper half.
+        var followLine = worldH * 0.42
+        if (py < followLine) {
+            var dy = followLine - py
+            py += dy
             for (var j = 0; j < platforms.length; j++)
                 platforms[j].y += dy
-            py += dy
+            cam -= dy
         }
 
-        // Gentle scroll — stay below a jump so it doesn't outrun landings.
-        if (maxHeight > 25) {
-            var rise = Math.min(0.85, 0.10 + maxHeight / 1200)
+        // Rising floor — faster with height, still under a fair jump step.
+        if (maxHeight > 15) {
+            var d = difficulty()
+            var rise = Math.min(1.75, 0.28 + d * 0.9 + maxHeight / 700)
             cam -= rise
             for (var k = 0; k < platforms.length; k++)
                 platforms[k].y += rise
             py += rise
+            keepPlayerInView()
         }
 
         platforms = platforms.filter(function (p) { return p.y < worldH + 80 })
         var minCount = Math.max(18, Math.round(worldH / 50))
-        var diff = difficulty()
+        var diff = Math.max(0.35, difficulty())
         while (platforms.length < minCount) {
             var prev = highestPlatform()
             if (!prev)
@@ -302,9 +334,16 @@ Item {
                 ctx.fillStyle = g
                 ctx.fillRect(0, 0, root.worldW, root.worldH)
 
+                // Side gutters (20% each) — slightly darker so the play lane reads.
+                var L = root.worldW * 0.20
+                var R = root.worldW * 0.80
+                ctx.fillStyle = "rgba(0,0,0,0.12)"
+                ctx.fillRect(0, 0, L, root.worldH)
+                ctx.fillRect(R, 0, root.worldW - R, root.worldH)
+
                 ctx.fillStyle = "rgba(255,255,255,0.04)"
                 var stepX = Math.max(40, root.worldW / 18)
-                for (var x = 0; x < root.worldW; x += stepX)
+                for (var x = L; x < R; x += stepX)
                     ctx.fillRect(x, 0, 1, root.worldH)
 
                 for (var i = 0; i < root.platforms.length; i++) {
