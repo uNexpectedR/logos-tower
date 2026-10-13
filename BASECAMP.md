@@ -16,9 +16,9 @@ https://github.com/uNexpectedR/logos-tower/releases/download/index/index.json
 
 ## Install steps
 
-1. Open **Logos Basecamp** (desktop, linux-amd64).
+1. Open **Logos Basecamp** (desktop — macOS Apple Silicon or Linux x86_64).
 2. **Settings → Package Repositories** (or Package Manager → Add repository).
-3. If you previously added the raw.githubusercontent.com catalog URL, remove it.
+3. If you previously added a raw.githubusercontent.com catalog URL, remove it.
 4. Paste the Releases catalog URL above → **Add**.
 5. Refresh / reopen **Package Manager** (or Package Monitor).
 6. Find **Logos Tower** (`logos_tower`) under **Social** → **Install**.
@@ -27,10 +27,12 @@ https://github.com/uNexpectedR/logos-tower/releases/download/index/index.json
 | | |
 | --- | --- |
 | Package id | `logos_tower` |
-| Version | `0.1.0` |
-| Variant | `linux-amd64` only (this release) |
+| Version | `0.1.1` |
+| Variants | `darwin-arm64`, `linux-amd64` |
 | Category | `social` |
-| Release | https://github.com/uNexpectedR/logos-tower/releases/tag/logos_tower-v0.1.0 |
+| Release | https://github.com/uNexpectedR/logos-tower/releases/tag/logos_tower-v0.1.1 |
+
+**macOS note:** Apple Silicon Basecamp expects `darwin-arm64`. Intel Mac (`darwin-amd64`) is not in this release yet.
 
 After install, play from the Basecamp sidebar app **Logos Tower** (no separate play URL — it is an in-shell UI module).
 
