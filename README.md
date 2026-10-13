@@ -52,5 +52,4 @@ Muted slate-teal `#6A838B` + white λ (`public/logos-lambda.png`).
 https://raw.githubusercontent.com/uNexpectedR/logos-tower/cursor/logos-tower-558f/logos-repo.json
 ```
 
-Native `.lgx` install is **not published yet** — see [BASECAMP.md](./BASECAMP.md). This app runs as a web/relay client today (`npm run dev`).
-
+Install package **`logos_tower` `0.1.0`**, then open **Logos Tower** from the Basecamp sidebar. Details and threat model: [BASECAMP.md](./BASECAMP.md).

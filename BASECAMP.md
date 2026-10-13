@@ -1,36 +1,38 @@
-# Basecamp install
+# Basecamp install — Logos Tower
 
-## Catalog URL (paste into Basecamp)
+## Catalog URL
 
 ```
 https://raw.githubusercontent.com/uNexpectedR/logos-tower/cursor/logos-tower-558f/logos-repo.json
 ```
 
-Basecamp → **Settings → Package Repositories** (or Package Manager → Add repository) → paste the URL → Add.
+## Install steps
 
-## Status
+1. Open **Logos Basecamp** (desktop).
+2. **Settings → Package Repositories** (or Package Manager → Add repository).
+3. Paste the catalog URL above → **Add**.
+4. Open **Package Manager**, find **Logos Tower** (`logos_tower`).
+5. **Install** → load/open from the sidebar (Apps).
 
-| Piece | State |
+| | |
 | --- | --- |
-| Catalog identity (`logos-repo.json`) | Published on this branch |
-| Package index | Published — **no `.lgx` packages yet** |
-| Installable Basecamp app | **Not ready** |
+| Package id | `logos_tower` |
+| Version | `0.1.0` |
+| Variant | `linux-amd64` |
+| Release | https://github.com/uNexpectedR/logos-tower/releases/tag/logos_tower-v0.1.0 |
 
-Logos Tower today matches the **ForumerMobile** shape: browser UI + Node relay to logos.dev (`@waku/sdk` + TCP). That is not a Qt/Logos Core `.lgx` module. Forumer itself installs from a catalog with native plugins; the phone/web client does not.
+After install, play from the Basecamp sidebar app **Logos Tower** (no separate play URL — it is an in-shell UI module).
 
-Until a `logos_tower` (or similar) UI/core module is built with `logos-module-builder` / Nix and released into `catalog/index.json`, Package Manager will show an empty catalog after you add the URL.
+## Threat model (brief)
 
-## Run the web app now
+- **Persona seed** lives in this Basecamp profile (`QSettings` org `logos` / app `logos_tower`). It never leaves the device except as public key + signatures on score envelopes. Clearing the persona wipes the seed from settings.
+- **Scores are not trusted as bare integers.** Submit path builds a canonical JSON envelope, mines **BLAKE2b PoW** (12 leading zero bits), **Ed25519-signs** `canonical ‖ nonce`, and **verifies the signature before** updating the board.
+- **Board** keeps best height per public key on-device. Cross-device/public logos.dev sync remains available via the web relay app in this repo; the Basecamp package verifies locally.
+- **Open source:** module sources under `module/`, vendored Monocypher for crypto. Index lists `sha256` + manifest `rootHash` for download verification.
+
+## Build from source
 
 ```bash
-git clone https://github.com/uNexpectedR/logos-tower.git
-cd logos-tower && git checkout cursor/logos-tower-558f
-npm install && npm run dev
+cd module
+nix build '.#lgx-portable' --out-link ../result-lgx
 ```
-
-## To make Basecamp Install work later
-
-1. Scaffold a Logos UI module (`nix flake init -t github:logos-co/logos-module-builder/0.3.2#ui-qml` or `#ui-qml-backend`).
-2. Prefer `delivery_module` for Waku instead of the Node TCP relay where possible.
-3. `nix build '.#lgx-portable'`, publish the `.lgx` on a GitHub release, rebuild `catalog/index.json` (see [logos-modules-release-base](https://github.com/logos-co/logos-modules-release-base)).
-4. Users keep using the same `logos-repo.json` URL above.
