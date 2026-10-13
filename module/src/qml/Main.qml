@@ -4,6 +4,11 @@ import QtQuick.Layouts
 
 Item {
     id: root
+    // Match working Basecamp ui_qml modules (e.g. storage_ui): give the
+    // embedded QQuickWidget a usable preferred size when first mounted.
+    implicitWidth: 420
+    implicitHeight: 720
+
     readonly property var backend: logos.module("logos_tower")
     property bool ready: false
     property string tab: "play" // play | login | board
