@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 2,
+  "repositoryName": "logos-tower",
+  "generatedAt": "2026-10-13T09:23:00Z",
+  "packages": [],
+  "notes": "No .lgx package yet. Logos Tower currently ships as a Next.js + Waku relay web app (ForumerMobile pattern). Add a Logos Core UI module build (nix flake → .lgx) here before Basecamp Package Manager can Install."
+}

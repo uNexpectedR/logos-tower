@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "logos-tower",
+  "displayName": "Logos Tower",
+  "description": "Vertical jumper with the Logos λ — persona login and a public board on logos.dev. Native Basecamp .lgx packaging is not published yet; run the web app from this repo (npm run dev). This catalog URL is the stable Basecamp repository entry point for when an .lgx release exists.",
+  "homepage": "https://github.com/uNexpectedR/logos-tower",
+  "indexUrl": "https://raw.githubusercontent.com/uNexpectedR/logos-tower/cursor/logos-tower-558f/catalog/index.json",
+  "trustedSigners": []
+}
