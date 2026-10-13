@@ -11,16 +11,21 @@ Item {
     property int score: 0
     property int best: 0
 
-    // World matches the visible canvas (1 unit ≈ 1 px) so the playfield is full-window.
+    // World matches the visible canvas (1 unit ≈ 1 px).
     property int worldW: 720
     property int worldH: 900
-    readonly property real gravity: 0.55
-    readonly property real jumpV: -13.5
-    readonly property real moveA: 0.72
-    readonly property real friction: 0.88
-    readonly property real maxVx: 8.5
+
+    // Icy Tower–style feel: strong jump, snappy air control, fair reach.
+    readonly property real gravity: 0.52
+    readonly property real jumpV: -14.2
+    readonly property real moveA: 0.95
+    readonly property real friction: 0.86
+    readonly property real maxVx: 9.0
     readonly property int playerSize: 44
-    readonly property int platformH: 12
+    readonly property int platformH: 14
+    // Landing forgiveness (px) so visually landable ledges register.
+    readonly property real landSlopY: 6
+    readonly property real landSlopX: 4
 
     property real px: 0
     property real py: 0
@@ -32,6 +37,35 @@ Item {
     property bool leftHeld: false
     property bool rightHeld: false
 
+    function maxJumpHeight() {
+        return (jumpV * jumpV) / (2 * gravity)
+    }
+
+    // Equilibrium horizontal speed while holding a direction (add then friction).
+    function holdSpeed() {
+        var s = (moveA * friction) / Math.max(0.001, 1 - friction)
+        return Math.min(maxVx, s)
+    }
+
+    // Frames in the air when jumping up by gapY (continuous approx).
+    function airTimeForGap(gapY) {
+        var v = -jumpV
+        var peak = maxJumpHeight()
+        var g = gravity
+        var dy = Math.max(0, Math.min(gapY, peak * 0.98))
+        var disc = v * v - 2 * g * dy
+        if (disc < 0)
+            disc = 0
+        var tUp = (v - Math.sqrt(disc)) / g
+        var tDown = Math.sqrt(2 * Math.max(0, peak - dy) / g)
+        return Math.max(12, tUp + tDown)
+    }
+
+    function difficulty() {
+        // 0 → early (easy), 1 → later (still capped fair).
+        return Math.min(1, maxHeight / 500)
+    }
+
     function syncWorldSize() {
         var nw = Math.max(520, Math.round(width))
         var nh = Math.max(640, Math.round(height))
@@ -39,9 +73,19 @@ Item {
             return
         worldW = nw
         worldH = nh
-        // Rebuild when idle so platforms match the new bounds; mid-run keep physics stable.
         if (phase !== "playing")
             resetWorld()
+    }
+
+    function highestPlatform() {
+        if (!platforms.length)
+            return null
+        var bestP = platforms[0]
+        for (var i = 1; i < platforms.length; i++) {
+            if (platforms[i].y < bestP.y)
+                bestP = platforms[i]
+        }
+        return bestP
     }
 
     function resetWorld() {
@@ -53,30 +97,52 @@ Item {
         vy = 0
         cam = 0
         maxHeight = 0
-        var groundW = Math.min(worldW * 0.28, 220)
+        var groundW = Math.min(worldW * 0.32, 260)
         platforms = [{
             x: worldW / 2 - groundW / 2,
             y: worldH - Math.max(48, worldH * 0.08),
             w: groundW
         }]
-        var gap = Math.max(70, Math.min(110, worldH * 0.10))
-        var y = platforms[0].y - gap
-        for (var i = 0; i < 16; i++) {
-            platforms.push(randomPlatform(y))
-            y -= gap * (0.85 + Math.random() * 0.35)
+        var prev = platforms[0]
+        for (var i = 0; i < 18; i++) {
+            prev = nextReachablePlatform(prev, i < 3 ? 0 : difficulty())
+            platforms.push(prev)
         }
         platformsChanged()
         canvas.requestPaint()
     }
 
-    function randomPlatform(y) {
-        // Wider ledges on a wide field so the λ stays catchable.
-        var minW = Math.max(90, worldW * 0.12)
-        var maxW = Math.max(minW + 20, worldW * 0.22)
+    // Place a platform reachable from `prev` with a normal jump (+ air steer).
+    function nextReachablePlatform(prev, diff) {
+        var peak = maxJumpHeight()
+        // Vertical gap: always under ~70% of peak; early game even shorter.
+        var maxGapY = peak * (0.52 + 0.18 * diff)   // ~52–70% of peak
+        var minGapY = peak * (0.22 + 0.06 * diff)   // ~22–28%
+        var gapY = minGapY + Math.random() * (maxGapY - minGapY)
+
+        var airT = airTimeForGap(gapY)
+        var hs = holdSpeed()
+        // Horizontal budget with margin for imperfect steering / rising floor.
+        var maxDx = hs * airT * (0.78 - 0.12 * diff)
+
+        var minW = Math.max(100, worldW * 0.14)
+        var maxW = Math.max(minW + 24, worldW * (0.24 - 0.04 * diff))
         var w = minW + Math.random() * (maxW - minW)
-        var margin = Math.max(24, worldW * 0.03)
-        var x = margin + Math.random() * Math.max(1, worldW - w - margin * 2)
-        return { x: x, y: y, w: w }
+
+        var prevCx = prev.x + prev.w / 2
+        var dx = (Math.random() * 2 - 1) * maxDx
+        // Bias toward center early so the first climbs aren't edge-trapped.
+        if (diff < 0.25)
+            dx *= 0.7
+        var cx = prevCx + dx
+        var margin = Math.max(20, worldW * 0.025)
+        var x = cx - w / 2
+        if (x < margin)
+            x = margin
+        if (x + w > worldW - margin)
+            x = worldW - margin - w
+
+        return { x: x, y: prev.y - gapY, w: w }
     }
 
     function startGame() {
@@ -88,11 +154,29 @@ Item {
     }
 
     function clampPlayerX() {
-        // Keep the λ inside the playfield (no wrap-around "outside" the view).
         if (px < 0)
             px = 0
         if (px > worldW - playerSize)
             px = worldW - playerSize
+    }
+
+    function tryLand() {
+        if (vy <= 0)
+            return false
+        var feet = py + playerSize
+        var prevFeet = feet - vy
+        for (var i = 0; i < platforms.length; i++) {
+            var p = platforms[i]
+            // Crossed the platform top this frame (with vertical slop).
+            if (prevFeet <= p.y + landSlopY && feet >= p.y
+                    && px + playerSize > p.x - landSlopX
+                    && px < p.x + p.w + landSlopX) {
+                py = p.y - playerSize
+                vy = jumpV
+                return true
+            }
+        }
+        return false
     }
 
     function step() {
@@ -112,20 +196,7 @@ Item {
         px += vx
         py += vy
         clampPlayerX()
-
-        if (vy > 0) {
-            for (var i = 0; i < platforms.length; i++) {
-                var p = platforms[i]
-                var prevBottom = py - vy + playerSize
-                var feet = py + playerSize
-                if (prevBottom <= p.y && feet >= p.y
-                        && px + playerSize > p.x && px < p.x + p.w) {
-                    py = p.y - playerSize
-                    vy = jumpV
-                    break
-                }
-            }
-        }
+        tryLand()
 
         var worldY = cam + (worldH - py)
         if (worldY / 10 > maxHeight)
@@ -141,8 +212,9 @@ Item {
             py += dy
         }
 
-        if (maxHeight > 20) {
-            var rise = Math.min(1.4, 0.18 + maxHeight / 700)
+        // Gentle scroll — stay below a jump so it doesn't outrun landings.
+        if (maxHeight > 25) {
+            var rise = Math.min(0.85, 0.10 + maxHeight / 1200)
             cam -= rise
             for (var k = 0; k < platforms.length; k++)
                 platforms[k].y += rise
@@ -150,15 +222,13 @@ Item {
         }
 
         platforms = platforms.filter(function (p) { return p.y < worldH + 80 })
-        var minCount = Math.max(16, Math.round(worldH / 55))
+        var minCount = Math.max(18, Math.round(worldH / 50))
+        var diff = difficulty()
         while (platforms.length < minCount) {
-            var top = platforms[0].y
-            for (var t = 1; t < platforms.length; t++) {
-                if (platforms[t].y < top)
-                    top = platforms[t].y
-            }
-            var gap = Math.max(70, Math.min(110, worldH * 0.10))
-            platforms.push(randomPlatform(top - (gap * (0.85 + Math.random() * 0.35))))
+            var prev = highestPlatform()
+            if (!prev)
+                break
+            platforms.push(nextReachablePlatform(prev, diff))
         }
         platformsChanged()
 

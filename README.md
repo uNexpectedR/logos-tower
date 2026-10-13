@@ -52,4 +52,4 @@ Muted slate-teal `#6A838B` + white λ (`public/logos-lambda.png`).
 https://github.com/uNexpectedR/logos-tower/releases/download/index/logos-repo.json
 ```
 
-Install package **`logos_tower` `0.1.4`** (`darwin-arm64` / `linux-amd64`, category Social), then open **Logos Tower** from the Basecamp sidebar. Details and threat model: [BASECAMP.md](./BASECAMP.md).
+Install package **`logos_tower` `0.1.5`** (`darwin-arm64` / `linux-amd64`, category Social), then open **Logos Tower** from the Basecamp sidebar. Details and threat model: [BASECAMP.md](./BASECAMP.md).
