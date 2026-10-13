@@ -19,20 +19,25 @@ Item {
     property int worldW: 720
     property int worldH: 900
 
-    // Icy Tower–style: base jump is modest; edge/combo boosts clear the long gaps.
-    readonly property real gravity: 0.58
-    readonly property real jumpV: -12.6
-    readonly property real edgeJumpExtra: -3.8
-    readonly property real springJumpExtra: -5.2
-    readonly property real moveA: 1.15
+    // Authentic Icy Tower feel: modest base hop; edge timing extends the arc.
+    // Combo rewards pace (helps beat the floor) but is NEVER required to land.
+    readonly property real gravity: 0.60
+    readonly property real jumpV: -13.0
+    readonly property real edgeJumpExtra: -3.4
+    readonly property real springJumpExtra: -4.0
+    readonly property real moveA: 1.20
     readonly property real friction: 0.86
-    readonly property real maxVx: 11.2
+    readonly property real maxVx: 11.5
     readonly property real wallRestitution: 0.94
     readonly property int playerSize: 44
     readonly property int platformH: 14
     readonly property real landSlopY: 5
-    readonly property real landSlopX: 2
-    readonly property real edgeZoneFrac: 0.22
+    readonly property real landSlopX: 3
+    readonly property real edgeZoneFrac: 0.24
+    // Generation safety margins (never spawn at the mathematical limit).
+    readonly property real gapPeakFracBase: 0.78
+    readonly property real gapPeakFracEdge: 0.86
+    readonly property real horizBudgetFrac: 0.78
 
     property real px: 0
     property real py: 0
@@ -54,35 +59,52 @@ Item {
         return maxJumpHeightFrom(jumpV)
     }
 
+    // Edge boost only — combo must not appear in spawn math.
+    function edgeJumpV0() {
+        return jumpV + edgeJumpExtra
+    }
+
     function edgeJumpV(comboBonus) {
         var c = Math.min(12, Math.max(0, comboBonus || 0))
-        return jumpV + edgeJumpExtra - c * 0.18
+        return edgeJumpV0() - c * 0.16
     }
 
-    function holdSpeed() {
-        var a = iceFrames > 0 ? moveA * 1.15 : moveA
-        var f = iceFrames > 0 ? Math.min(0.92, friction + 0.04) : friction
-        var s = (a * f) / Math.max(0.001, 1 - f)
-        var cap = iceFrames > 0 ? maxVx * 1.12 : maxVx
-        return Math.min(cap, s)
+    // Steady air steer speed (no ice). Used for generation budgets.
+    function cruiseSpeed() {
+        var s = (moveA * friction) / Math.max(0.001, 1 - friction)
+        return Math.min(maxVx, s)
     }
 
+    // Time to land on a ledge `gapY` above takeoff (descent landing).
     function airTimeForGap(gapY, vJump) {
-        var v = -vJump
+        var u0 = -vJump
         var peak = maxJumpHeightFrom(vJump)
         var g = gravity
-        var dy = Math.max(0, Math.min(gapY, peak * 0.98))
-        var disc = v * v - 2 * g * dy
-        if (disc < 0)
-            disc = 0
-        var tUp = (v - Math.sqrt(disc)) / g
-        var tDown = Math.sqrt(2 * Math.max(0, peak - dy) / g)
-        return Math.max(12, tUp + tDown)
+        var dy = Math.max(0, Math.min(gapY, peak * 0.96))
+        var tPeak = u0 / g
+        var tFall = Math.sqrt(2 * Math.max(0, peak - dy) / g)
+        return Math.max(10, tPeak + tFall)
+    }
+
+    function maxHorizTravel(gapY, vJump) {
+        return cruiseSpeed() * airTimeForGap(gapY, vJump) * horizBudgetFrac
+    }
+
+    // Minimum horizontal travel from a standable pose on `prev` to overlap `next`.
+    function horizClearance(prevX, prevW, nextX, nextW) {
+        var pL = prevX
+        var pR = prevX + Math.max(0, prevW - playerSize)
+        var nL = nextX
+        var nR = nextX + Math.max(0, nextW - playerSize)
+        if (pR >= nL && pL <= nR)
+            return 0
+        if (nL > pR)
+            return nL - pR
+        return pL - nR
     }
 
     function difficulty() {
-        // Spicy early; near-cap by ~height 160.
-        return Math.min(1, maxHeight / 160)
+        return Math.min(1, maxHeight / 140)
     }
 
     // Platforms live only in the center 60% (20% empty gutter each side).
@@ -121,10 +143,12 @@ Item {
             scrollWorld(topLimit - py)
     }
 
+    // Rising floor — starts immediately and ramps hard so long hangs get eaten.
     function floorRiseSpeed() {
         var d = difficulty()
-        var t = Math.min(1, runFrames / (60 * 55)) // ~55s to full time ramp
-        return Math.min(3.35, 0.62 + d * 1.55 + t * 1.15 + maxHeight / 380)
+        var t = Math.min(1, runFrames / (60 * 40)) // ~40s to full time ramp
+        // Early pressure (~1.1), mid ~2.4, late cap ~3.9 — outpace needs edge/combo.
+        return Math.min(3.9, 1.05 + d * 1.7 + t * 1.35 + maxHeight / 320)
     }
 
     function syncWorldSize() {
@@ -141,10 +165,13 @@ Item {
     function highestPlatform() {
         if (!platforms.length)
             return null
-        var bestP = platforms[0]
-        for (var i = 1; i < platforms.length; i++) {
-            if (platforms[i].y < bestP.y)
-                bestP = platforms[i]
+        var bestP = null
+        for (var i = 0; i < platforms.length; i++) {
+            var p = platforms[i]
+            if (!p.alive)
+                continue
+            if (!bestP || p.y < bestP.y)
+                bestP = p
         }
         return bestP
     }
@@ -172,32 +199,23 @@ Item {
         shoutFrames = 48
     }
 
-    function makePlatform(x, y, w, kind) {
-        var p = {
+    function makePlatform(x, y, w, kind, amp, speed, phase) {
+        return {
             x: x,
             y: y,
             w: w,
             kind: kind || "normal",
             baseX: x,
-            phase: Math.random() * Math.PI * 2,
-            amp: 0,
-            speed: 0,
-            alive: true,
-            crumTimer: 0
+            phase: phase !== undefined ? phase : Math.random() * Math.PI * 2,
+            amp: amp || 0,
+            speed: speed || 0,
+            alive: true
         }
-        if (kind === "moving") {
-            p.amp = 18 + Math.random() * 36
-            p.speed = 0.035 + Math.random() * 0.04 + difficulty() * 0.02
-            // Keep travel inside the lane.
-            var maxAmp = Math.max(8, Math.min(p.x - laneLeft(), laneRight() - (p.x + p.w)))
-            p.amp = Math.min(p.amp, maxAmp)
-        }
-        return p
     }
 
-    function platformSurfaceX(p) {
+    function platformSurfaceX(p, frame) {
         if (p.kind === "moving")
-            return p.baseX + Math.sin(p.phase + runFrames * p.speed) * p.amp
+            return p.baseX + Math.sin(p.phase + frame * p.speed) * p.amp
         return p.x
     }
 
@@ -205,29 +223,36 @@ Item {
         for (var i = 0; i < platforms.length; i++) {
             var p = platforms[i]
             if (p.kind === "moving")
-                p.x = platformSurfaceX(p)
+                p.x = platformSurfaceX(p, runFrames)
         }
     }
 
-    function pickKind(diff, index) {
+    function pickKind(diff, index, stretch) {
         var r = Math.random()
-        // Early climb: mostly normal; spice in gradually.
-        if (index < 3 || diff < 0.2) {
-            if (r < 0.12)
+        if (index < 3 || diff < 0.18) {
+            if (r < 0.10)
                 return "narrow"
             return "normal"
         }
-        if (r < 0.10 + diff * 0.06)
-            return "spike"
-        if (r < 0.22 + diff * 0.08)
+        // Stretch jumps stay on solid footing (no movers/crumbs on the hard arc).
+        if (stretch) {
+            if (r < 0.18)
+                return "narrow"
+            if (r < 0.30)
+                return "spring"
+            if (r < 0.42)
+                return "ice"
+            return "normal"
+        }
+        if (r < 0.14 + diff * 0.06)
             return "moving"
-        if (r < 0.34 + diff * 0.06)
+        if (r < 0.24 + diff * 0.05)
             return "crumb"
-        if (r < 0.46 + diff * 0.05)
+        if (r < 0.38 + diff * 0.04)
             return "ice"
-        if (r < 0.56 + diff * 0.04)
+        if (r < 0.48)
             return "spring"
-        if (r < 0.72)
+        if (r < 0.68)
             return "narrow"
         return "normal"
     }
@@ -250,82 +275,107 @@ Item {
         var ground = clampPlatformInLane(worldW / 2 - groundW / 2, groundW)
         platforms = [makePlatform(ground.x, worldH - Math.max(48, worldH * 0.08), ground.w, "normal")]
         var prev = platforms[0]
-        for (var i = 0; i < 20; i++) {
-            var d = i < 2 ? 0.12 : Math.max(0.40, difficulty())
-            var batch = nextReachableBatch(prev, d, i)
-            for (var j = 0; j < batch.length; j++) {
-                platforms.push(batch[j])
-                prev = batch[j]
-            }
+        for (var i = 0; i < 22; i++) {
+            var d = i < 3 ? 0.10 : Math.max(0.35, difficulty())
+            var next = nextReachablePlatform(prev, d, i)
+            platforms.push(next)
+            prev = next
         }
         platformsChanged()
         canvas.requestPaint()
     }
 
-    // One or two ledges (chained pair) reachable with skill; stretch gaps need edge boosts.
-    function nextReachableBatch(prev, diff, index) {
-        var kind = pickKind(diff, index)
-        var useEdgeEnvelope = Math.random() < (0.28 + diff * 0.45)
-        var vJump = useEdgeEnvelope ? edgeJumpV(Math.min(6, Math.floor(diff * 8))) : jumpV
-        // Springs after a stretch are slightly more common.
-        if (useEdgeEnvelope && Math.random() < 0.18)
-            kind = "spring"
-        if (kind === "spike" && index < 5)
-            kind = "narrow"
-
+    // Place one landable ledge. Stretch uses edgeJumpV0 only (never combo).
+    // Retries until horiz+vert clearance passes; falls back to a safe hop.
+    function nextReachablePlatform(prev, diff, index) {
+        var stretch = Math.random() < (0.22 + diff * 0.40)
+        var vJump = stretch ? edgeJumpV0() : jumpV
         var peak = maxJumpHeightFrom(vJump)
-        var maxGapY = peak * (0.62 + 0.28 * diff)   // ~62–90% of chosen envelope
-        var minGapY = peak * (0.42 + 0.18 * diff)   // ~42–60%
-        if (minGapY > maxGapY - 10)
-            minGapY = maxGapY - 10
-        var gapY = minGapY + (0.50 + Math.random() * 0.50) * (maxGapY - minGapY)
+        var peakFrac = stretch ? gapPeakFracEdge : gapPeakFracBase
+        // Keep gaps in a band the chosen skill can clear — not RNG death.
+        var maxGapY = peak * peakFrac
+        var minGapY = peak * (stretch ? 0.55 : 0.40) * (0.85 + 0.15 * diff)
+        if (minGapY > maxGapY - 12)
+            minGapY = maxGapY - 12
 
-        var airT = airTimeForGap(gapY, vJump)
-        var hs = holdSpeed()
-        var maxDx = hs * airT * (0.88 - 0.10 * diff)
-        maxDx = Math.min(maxDx, laneWidth() * 0.88)
+        var kind = pickKind(diff, index, stretch)
+        var attempt = 0
+        var placed = null
+        var gapY = minGapY
+        var w = 80
 
-        var minW
-        var maxW
-        if (kind === "narrow") {
-            minW = Math.max(42, laneWidth() * (0.08 - 0.02 * diff))
-            maxW = Math.max(minW + 8, laneWidth() * (0.14 - 0.03 * diff))
-        } else if (kind === "spike" || kind === "spring") {
-            minW = Math.max(56, laneWidth() * (0.12 - 0.02 * diff))
-            maxW = Math.max(minW + 10, laneWidth() * (0.22 - 0.04 * diff))
-        } else {
-            minW = Math.max(58, laneWidth() * (0.12 - 0.03 * diff))
-            maxW = Math.max(minW + 12, laneWidth() * (0.24 - 0.06 * diff))
-        }
-        var w = minW + Math.random() * (maxW - minW)
+        while (attempt < 14) {
+            attempt++
+            gapY = minGapY + Math.random() * (maxGapY - minGapY)
+            // Bias stretch toward the upper band (feels long, still landable).
+            if (stretch)
+                gapY = minGapY + (0.55 + Math.random() * 0.45) * (maxGapY - minGapY)
 
-        var prevCx = prev.x + prev.w / 2
-        var side = Math.random() < 0.5 ? -1 : 1
-        var dx = side * (0.50 + Math.random() * 0.50) * maxDx
-        var cx = prevCx + dx
-        var placed = clampPlatformInLane(cx - w / 2, w)
-        var y = prev.y - gapY
-        var main = makePlatform(placed.x, y, placed.w, kind)
-
-        var batch = [main]
-        // Chained twin ledge — tight second footing at nearly the same height.
-        if (kind !== "spike" && Math.random() < (0.16 + diff * 0.14)) {
-            var twinW = Math.max(40, w * (0.45 + Math.random() * 0.25))
-            var gapBetween = 16 + Math.random() * 28
-            var twinX
-            if (main.x + main.w + gapBetween + twinW <= laneRight())
-                twinX = main.x + main.w + gapBetween
-            else if (main.x - gapBetween - twinW >= laneLeft())
-                twinX = main.x - gapBetween - twinW
+            var budget = maxHorizTravel(gapY, vJump)
+            if (kind === "narrow")
+                w = Math.max(48, laneWidth() * (0.09 - 0.015 * diff)) + Math.random() * Math.max(8, laneWidth() * 0.04)
+            else if (kind === "spring")
+                w = Math.max(64, laneWidth() * (0.13 - 0.02 * diff)) + Math.random() * Math.max(10, laneWidth() * 0.06)
             else
-                twinX = NaN
-            if (!isNaN(twinX)) {
-                var twinKind = Math.random() < 0.35 ? "narrow" : (Math.random() < 0.25 ? "ice" : "normal")
-                var twinPlaced = clampPlatformInLane(twinX, twinW)
-                batch.push(makePlatform(twinPlaced.x, y - (4 + Math.random() * 14), twinPlaced.w, twinKind))
+                w = Math.max(62, laneWidth() * (0.13 - 0.025 * diff)) + Math.random() * Math.max(12, laneWidth() * 0.08)
+
+            var side = Math.random() < 0.5 ? -1 : 1
+            // Aim well inside the budget so clamp + width cannot strand the player.
+            var targetClear = budget * (0.35 + Math.random() * 0.50)
+            var prevCx = prev.x + prev.w / 2
+            var cx = prevCx + side * (targetClear + w / 2)
+            var cand = clampPlatformInLane(cx - w / 2, w)
+            var clear = horizClearance(prev.x, prev.w, cand.x, cand.w)
+
+            var amp = 0
+            var speed = 0
+            var phase = Math.random() * Math.PI * 2
+            if (kind === "moving") {
+                // Farthest swing must remain inside the horizontal budget.
+                var slack = Math.max(0, budget - clear)
+                amp = Math.min(14 + diff * 10, slack * 0.45)
+                var maxAmp = Math.max(0, Math.min(cand.x - laneLeft(), laneRight() - (cand.x + cand.w)))
+                amp = Math.min(amp, maxAmp)
+                if (amp < 6) {
+                    kind = "normal"
+                    amp = 0
+                } else {
+                    speed = 0.028 + Math.random() * 0.03 + diff * 0.015
+                    // Re-check clearance at both extremes.
+                    var leftX = cand.x - amp
+                    var rightX = cand.x + amp
+                    var cL = horizClearance(prev.x, prev.w, leftX, cand.w)
+                    var cR = horizClearance(prev.x, prev.w, rightX, cand.w)
+                    if (Math.max(cL, cR) > budget) {
+                        amp = 0
+                        kind = "normal"
+                        speed = 0
+                    } else {
+                        clear = Math.max(cL, cR)
+                    }
+                }
+            }
+
+            if (gapY <= peak * 0.92 && clear <= budget) {
+                placed = makePlatform(cand.x, prev.y - gapY, cand.w, kind, amp, speed, phase)
+                break
             }
         }
-        return batch
+
+        if (!placed) {
+            // Guaranteed safe hop — base envelope, short gap, near prev.
+            gapY = maxJumpHeightFrom(jumpV) * 0.48
+            w = Math.max(72, laneWidth() * 0.16)
+            var safeCx = prev.x + prev.w / 2
+            var safe = clampPlatformInLane(safeCx - w / 2, w)
+            // Nudge toward center if somehow extreme.
+            if (horizClearance(prev.x, prev.w, safe.x, safe.w) > maxHorizTravel(gapY, jumpV)) {
+                safe = clampPlatformInLane(prev.x + (prev.w - w) / 2, w)
+            }
+            placed = makePlatform(safe.x, prev.y - gapY, safe.w, "normal")
+        }
+
+        return placed
     }
 
     function startGame() {
@@ -355,7 +405,6 @@ Item {
                 vx = -2.5
             bounced = true
         }
-        // Soft upward kiss on a committed wall slap — classic recovery feel.
         if (bounced && vy > -2 && Math.abs(vx) > 4)
             vy -= 1.1
         return bounced
@@ -368,13 +417,11 @@ Item {
         var onRight = feetCx >= surfX + p.w - zone
         if (!onLeft && !onRight)
             return false
-        // Edge must be taken with outward (or strong) horizontal speed.
-        if (onLeft && vx <= -2.2)
+        if (onLeft && vx <= -2.0)
             return true
-        if (onRight && vx >= 2.2)
+        if (onRight && vx >= 2.0)
             return true
-        // Near-edge with high speed still counts (risk).
-        return Math.abs(vx) >= 7.5 && (onLeft || onRight)
+        return Math.abs(vx) >= 7.2 && (onLeft || onRight)
     }
 
     function tryLand() {
@@ -386,22 +433,12 @@ Item {
             var p = platforms[i]
             if (!p.alive)
                 continue
-            var surfX = (p.kind === "moving") ? platformSurfaceX(p) : p.x
+            var surfX = (p.kind === "moving") ? platformSurfaceX(p, runFrames) : p.x
             if (p.kind === "moving")
                 p.x = surfX
             if (prevFeet <= p.y + landSlopY && feet >= p.y
                     && px + playerSize > surfX - landSlopX
                     && px < surfX + p.w + landSlopX) {
-                if (p.kind === "spike") {
-                    py = p.y - playerSize
-                    vy = 0
-                    phase = "over"
-                    if (score > best)
-                        best = score
-                    root.fell(score)
-                    return true
-                }
-
                 py = p.y - playerSize
                 var edged = isEdgeLand(p, surfX)
                 combo += edged ? 2 : 1
@@ -410,27 +447,24 @@ Item {
 
                 var jump = jumpV
                 if (p.kind === "spring")
-                    jump = jumpV + springJumpExtra - Math.min(6, combo) * 0.12
+                    jump = jumpV + springJumpExtra - Math.min(5, combo) * 0.10
                 else if (edged)
                     jump = edgeJumpV(combo)
                 else if (combo >= 6)
-                    jump = jumpV - Math.min(2.2, (combo - 5) * 0.22)
+                    jump = jumpV - Math.min(2.0, (combo - 5) * 0.18)
 
-                // Carry a little horizontal snap on edge landings.
                 if (edged) {
-                    var boost = 1.15 + Math.min(2.4, combo * 0.08)
+                    var boost = 1.12 + Math.min(2.2, combo * 0.07)
                     if (vx >= 0)
-                        vx = Math.min(maxVx * 1.15, Math.max(vx, 4.2) * boost / 1.4 + 1.1)
+                        vx = Math.min(maxVx * 1.12, Math.max(vx, 4.0) * boost / 1.4 + 1.0)
                     else
-                        vx = Math.max(-maxVx * 1.15, Math.min(vx, -4.2) * boost / 1.4 - 1.1)
+                        vx = Math.max(-maxVx * 1.12, Math.min(vx, -4.0) * boost / 1.4 - 1.0)
                 }
 
                 if (p.kind === "ice")
-                    iceFrames = 55
-                if (p.kind === "crumb") {
+                    iceFrames = 50
+                if (p.kind === "crumb")
                     p.alive = false
-                    p.crumTimer = 1
-                }
 
                 vy = jump
                 flashShout(shoutForCombo(combo, edged || p.kind === "spring"))
@@ -452,9 +486,9 @@ Item {
         if (iceFrames > 0)
             iceFrames--
 
-        var a = iceFrames > 0 ? moveA * 1.2 : moveA
+        var a = iceFrames > 0 ? moveA * 1.15 : moveA
         var f = iceFrames > 0 ? 0.90 : friction
-        var cap = iceFrames > 0 ? maxVx * 1.15 : maxVx
+        var cap = iceFrames > 0 ? maxVx * 1.12 : maxVx
         if (leftHeld)
             vx -= a
         if (rightHeld)
@@ -482,30 +516,24 @@ Item {
         var worldY = cam + (worldH - py)
         if (worldY / 10 > maxHeight)
             maxHeight = worldY / 10
-        // Height drives the board; combo is style feedback (and jump power).
         score = Math.floor(maxHeight)
 
-        if (maxHeight > 6)
-            scrollWorld(floorRiseSpeed())
+        // Floor rises from the first frame — long hangs get squeezed like IT.
+        scrollWorld(floorRiseSpeed())
 
         followPlayerUp()
 
-        // Crumble cleanup + cull below view.
         platforms = platforms.filter(function (p) {
-            if (!p.alive)
-                return false
-            return p.y < worldH + 80
+            return p.alive && p.y < worldH + 80
         })
 
-        var minCount = Math.max(20, Math.round(worldH / 46))
-        var diff = Math.max(0.42, difficulty())
+        var minCount = Math.max(22, Math.round(worldH / 44))
+        var diff = Math.max(0.35, difficulty())
         while (platforms.length < minCount) {
             var prev = highestPlatform()
             if (!prev)
                 break
-            var batch = nextReachableBatch(prev, diff, platforms.length)
-            for (var b = 0; b < batch.length; b++)
-                platforms.push(batch[b])
+            platforms.push(nextReachablePlatform(prev, diff, platforms.length))
         }
         platformsChanged()
 
@@ -563,8 +591,6 @@ Item {
             return "#a7c4b4"
         if (kind === "narrow")
             return "#e7eef1"
-        if (kind === "spike")
-            return "#f0f4f6"
         return "#f7fafb"
     }
 
@@ -597,7 +623,6 @@ Item {
 
                 var L = root.worldW * 0.20
                 var R = root.worldW * 0.80
-                // Tower walls / gutters.
                 ctx.fillStyle = "rgba(0,0,0,0.16)"
                 ctx.fillRect(0, 0, L, root.worldH)
                 ctx.fillRect(R, 0, root.worldW - R, root.worldH)
@@ -614,30 +639,20 @@ Item {
                     var p = root.platforms[i]
                     if (!p.alive)
                         continue
-                    var drawX = p.x
                     ctx.fillStyle = root.platformFill(p.kind)
-                    ctx.fillRect(drawX, p.y, p.w, root.platformH)
-                    if (p.kind === "spike") {
-                        ctx.fillStyle = "#c45b5b"
-                        var teeth = Math.max(2, Math.floor(p.w / 10))
-                        var tw = p.w / teeth
-                        for (var t = 0; t < teeth; t++) {
-                            ctx.beginPath()
-                            ctx.moveTo(drawX + t * tw, p.y)
-                            ctx.lineTo(drawX + t * tw + tw / 2, p.y - 7)
-                            ctx.lineTo(drawX + (t + 1) * tw, p.y)
-                            ctx.closePath()
-                            ctx.fill()
-                        }
-                    } else if (p.kind === "spring") {
+                    ctx.fillRect(p.x, p.y, p.w, root.platformH)
+                    if (p.kind === "spring") {
                         ctx.fillStyle = "#6a838b"
-                        ctx.fillRect(drawX + p.w * 0.2, p.y - 3, p.w * 0.6, 3)
+                        ctx.fillRect(p.x + p.w * 0.2, p.y - 3, p.w * 0.6, 3)
                     } else if (p.kind === "ice") {
                         ctx.fillStyle = "rgba(255,255,255,0.35)"
-                        ctx.fillRect(drawX + 2, p.y + 2, Math.max(4, p.w - 4), 3)
+                        ctx.fillRect(p.x + 2, p.y + 2, Math.max(4, p.w - 4), 3)
                     } else if (p.kind === "moving") {
                         ctx.fillStyle = "#6a838b"
-                        ctx.fillRect(drawX + 4, p.y + 5, Math.max(6, p.w - 8), 3)
+                        ctx.fillRect(p.x + 4, p.y + 5, Math.max(6, p.w - 8), 3)
+                    } else if (p.kind === "crumb") {
+                        ctx.fillStyle = "rgba(90,70,40,0.35)"
+                        ctx.fillRect(p.x + 3, p.y + 4, Math.max(4, p.w - 6), 2)
                     }
                 }
             }
@@ -722,7 +737,7 @@ Item {
                     color: "#dfe8eb"
                     font.pixelSize: 15
                     text: root.phase === "ready"
-                          ? "Edge jumps and combos clear the long gaps. Bounce the lane walls. ← → or A D. Space to start."
+                          ? "The floor is rising — keep climbing. Edge jumps beat the long gaps. ← → or A D. Space to start."
                           : (root.bestCombo > 0
                              ? ("Best combo x" + root.bestCombo + ". Height is signed before it hits the board.")
                              : "Height is signed before it hits the board.")
