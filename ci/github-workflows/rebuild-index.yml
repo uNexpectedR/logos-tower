@@ -1,0 +1,18 @@
+name: Rebuild index
+
+# Regenerates the rolling `index` release (index.json + logos-repo.json assets)
+# after a module release, on a schedule, or manually.
+
+on:
+  workflow_dispatch: {}
+  repository_dispatch:
+    types: [rebuild-index]
+  schedule:
+    - cron: "23 */6 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    uses: logos-co/logos-modules-release-action/.github/workflows/rebuild-index.yml@v1
