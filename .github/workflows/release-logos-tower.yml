@@ -1,0 +1,30 @@
+name: Release logos_tower
+
+# Builds portable LGX on darwin-arm64 + linux-amd64 (GitHub-hosted),
+# merges into one multi-variant package, publishes logos_tower-v*, and
+# dispatches rebuild-index for the rolling catalog release.
+#
+# Uses logos-co/logos-modules-release-action — same pipeline as forumer-catalog.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: "Force rebuild/replace an already-published same version."
+        type: boolean
+        default: false
+  push:
+    tags: ["logos_tower-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: logos-co/logos-modules-release-action/.github/workflows/release.yml@v1
+    with:
+      module_path: module
+      variants: "darwin-arm64,linux-amd64"
+      # Default skip when already published; workflow_dispatch can force rebuild.
+      skip_if_published: ${{ github.event_name != 'workflow_dispatch' || !inputs.force_build }}
+      signing_mode: none
