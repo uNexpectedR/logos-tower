@@ -1,7 +1,7 @@
 {
   "name": "logos_tower",
   "display_name": "Logos Tower",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "type": "ui_qml",
   "interface": "universal",
   "category": "social",
