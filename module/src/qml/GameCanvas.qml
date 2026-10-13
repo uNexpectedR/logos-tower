@@ -43,7 +43,10 @@ Item {
     property real py: 0
     property real vx: 0
     property real vy: 0
+    // cam decreases as the world scrolls up (camera follow / floor rise).
     property real cam: 0
+    // Spawn screen-Y; altitude is measured above this pose in world space.
+    property real startPy: 0
     property real maxHeight: 0
     property int runFrames: 0
     property int iceFrames: 0
@@ -131,10 +134,25 @@ Item {
     function scrollWorld(amount) {
         if (amount <= 0)
             return
+        // Shift screen coords together — world altitude must stay invariant
+        // (see altitudePx). Previously `cam + (worldH - py)` lost 2*amount per scroll.
         py += amount
         for (var i = 0; i < platforms.length; i++)
             platforms[i].y += amount
         cam -= amount
+    }
+
+    // Climbed distance in px above spawn. Invariant under scrollWorld:
+    //   cam -= a, py += a  ⇒  (-cam) + (startPy - py) unchanged.
+    function altitudePx() {
+        return (-cam) + (startPy - py)
+    }
+
+    function noteHeight() {
+        var h = altitudePx() / 10 // ~Icy Tower “floors” (10 px ≈ 1 unit)
+        if (h > maxHeight)
+            maxHeight = h
+        score = Math.max(0, Math.floor(maxHeight))
     }
 
     function followPlayerUp() {
@@ -268,10 +286,12 @@ Item {
             return
         px = worldW / 2 - playerSize / 2
         py = worldH - Math.max(160, worldH * 0.22)
+        startPy = py
         vx = 0
         vy = 0
         cam = 0
         maxHeight = 0
+        score = 0
         runFrames = 0
         iceFrames = 0
         combo = 0
@@ -523,16 +543,13 @@ Item {
         }
 
         followPlayerUp()
+        // Sample after physics + camera catch-up (scroll-invariant).
+        noteHeight()
 
-        var worldY = cam + (worldH - py)
-        if (worldY / 10 > maxHeight)
-            maxHeight = worldY / 10
-        score = Math.floor(maxHeight)
-
-        // Floor rises from the first frame — long hangs get squeezed like IT.
+        // Floor rise squeezes stalls; must not alter climbed altitude.
         scrollWorld(floorRiseSpeed())
-
         followPlayerUp()
+        noteHeight()
 
         platforms = platforms.filter(function (p) {
             return p.alive && p.y < worldH + 80
@@ -549,6 +566,7 @@ Item {
         platformsChanged()
 
         if (py > worldH + 60) {
+            noteHeight()
             phase = "over"
             if (score > best)
                 best = score
