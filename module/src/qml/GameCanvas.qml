@@ -206,7 +206,7 @@ Item {
 
         Image {
             id: lambda
-            source: "lambda.png"
+            source: "player-lambda.png"
             width: root.playerSize + 8
             height: root.playerSize + 8
             x: root.px * (parent.width / root.worldW) - 4
