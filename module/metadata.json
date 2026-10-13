@@ -1,0 +1,29 @@
+{
+  "name": "logos_tower",
+  "display_name": "Logos Tower",
+  "version": "0.1.0",
+  "type": "ui_qml",
+  "interface": "universal",
+  "category": "games",
+  "description": "Vertical jumper with the Logos λ. Ed25519 persona login and signed height scores (BLAKE2b PoW). Open source.",
+  "main": "logos_tower_plugin",
+  "icon": "src/icons/icon.png",
+  "view": "qml/Main.qml",
+  "dependencies": [],
+  "provides": [],
+  "uses": [],
+  "codegen": { "rep": "src/logos_tower.rep" },
+  "nix": {
+    "packages": {
+      "build": [],
+      "runtime": []
+    },
+    "external_libraries": [],
+    "cmake": {
+      "find_packages": [],
+      "extra_sources": [],
+      "extra_include_dirs": [],
+      "extra_link_libraries": []
+    }
+  }
+}

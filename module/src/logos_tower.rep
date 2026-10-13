@@ -1,0 +1,11 @@
+class LogosTower
+{
+    SLOT(QString ensurePersona(QString alias))
+    SLOT(QString clearPersona())
+    SLOT(QString signAndSubmit(int height))
+    SLOT(QString leaderboardJson())
+    PROP(QString status="Ready" READONLY)
+    PROP(QString persona="*" READONLY)
+    PROP(QString board="[]" READONLY)
+    PROP(QString message="" READONLY)
+}
