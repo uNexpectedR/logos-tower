@@ -4,21 +4,26 @@ Item {
     id: root
     signal fell(int height)
 
+    // Space reserved for Main.qml's floating chrome when play is full-bleed.
+    property int topSafe: 0
+
     property string phase: "ready" // ready | playing | over
     property int score: 0
     property int best: 0
 
-    readonly property int worldW: 360
-    readonly property int worldH: 640
-    readonly property real gravity: 0.42
-    readonly property real jumpV: -11.2
-    readonly property real moveA: 0.55
-    readonly property real friction: 0.86
-    readonly property real maxVx: 6.2
-    readonly property int playerSize: 36
+    // World matches the visible canvas (1 unit ≈ 1 px) so the playfield is full-window.
+    property int worldW: 720
+    property int worldH: 900
+    readonly property real gravity: 0.55
+    readonly property real jumpV: -13.5
+    readonly property real moveA: 0.72
+    readonly property real friction: 0.88
+    readonly property real maxVx: 8.5
+    readonly property int playerSize: 44
+    readonly property int platformH: 12
 
-    property real px: worldW / 2 - playerSize / 2
-    property real py: worldH - 140
+    property real px: 0
+    property real py: 0
     property real vx: 0
     property real vy: 0
     property real cam: 0
@@ -27,33 +32,67 @@ Item {
     property bool leftHeld: false
     property bool rightHeld: false
 
+    function syncWorldSize() {
+        var nw = Math.max(520, Math.round(width))
+        var nh = Math.max(640, Math.round(height))
+        if (nw === worldW && nh === worldH)
+            return
+        worldW = nw
+        worldH = nh
+        // Rebuild when idle so platforms match the new bounds; mid-run keep physics stable.
+        if (phase !== "playing")
+            resetWorld()
+    }
+
     function resetWorld() {
+        if (worldW < 100 || worldH < 100)
+            return
         px = worldW / 2 - playerSize / 2
-        py = worldH - 140
+        py = worldH - Math.max(160, worldH * 0.22)
         vx = 0
         vy = 0
         cam = 0
         maxHeight = 0
-        platforms = [{ x: worldW / 2 - 50, y: worldH - 60, w: 100 }]
-        var y = worldH - 140
-        for (var i = 0; i < 12; i++) {
-            y -= 70 + Math.random() * 30
+        var groundW = Math.min(worldW * 0.28, 220)
+        platforms = [{
+            x: worldW / 2 - groundW / 2,
+            y: worldH - Math.max(48, worldH * 0.08),
+            w: groundW
+        }]
+        var gap = Math.max(70, Math.min(110, worldH * 0.10))
+        var y = platforms[0].y - gap
+        for (var i = 0; i < 16; i++) {
             platforms.push(randomPlatform(y))
+            y -= gap * (0.85 + Math.random() * 0.35)
         }
         platformsChanged()
+        canvas.requestPaint()
     }
 
     function randomPlatform(y) {
-        var w = 70 + Math.random() * 50
-        var x = 16 + Math.random() * (worldW - w - 32)
+        // Wider ledges on a wide field so the λ stays catchable.
+        var minW = Math.max(90, worldW * 0.12)
+        var maxW = Math.max(minW + 20, worldW * 0.22)
+        var w = minW + Math.random() * (maxW - minW)
+        var margin = Math.max(24, worldW * 0.03)
+        var x = margin + Math.random() * Math.max(1, worldW - w - margin * 2)
         return { x: x, y: y, w: w }
     }
 
     function startGame() {
+        syncWorldSize()
         resetWorld()
         phase = "playing"
         vy = jumpV
         root.forceActiveFocus()
+    }
+
+    function clampPlayerX() {
+        // Keep the λ inside the playfield (no wrap-around "outside" the view).
+        if (px < 0)
+            px = 0
+        if (px > worldW - playerSize)
+            px = worldW - playerSize
     }
 
     function step() {
@@ -72,18 +111,15 @@ Item {
         vy += gravity
         px += vx
         py += vy
-
-        if (px < -playerSize)
-            px = worldW
-        if (px > worldW)
-            px = -playerSize
+        clampPlayerX()
 
         if (vy > 0) {
             for (var i = 0; i < platforms.length; i++) {
                 var p = platforms[i]
                 var prevBottom = py - vy + playerSize
                 var feet = py + playerSize
-                if (prevBottom <= p.y && feet >= p.y && px + playerSize > p.x && px < p.x + p.w) {
+                if (prevBottom <= p.y && feet >= p.y
+                        && px + playerSize > p.x && px < p.x + p.w) {
                     py = p.y - playerSize
                     vy = jumpV
                     break
@@ -96,7 +132,7 @@ Item {
             maxHeight = worldY / 10
         score = Math.floor(maxHeight)
 
-        var targetCam = Math.max(0, py - worldH * 0.45)
+        var targetCam = Math.max(0, py - worldH * 0.48)
         if (targetCam < cam) {
             var dy = cam - targetCam
             cam = targetCam
@@ -106,25 +142,27 @@ Item {
         }
 
         if (maxHeight > 20) {
-            var rise = Math.min(1.1, 0.15 + maxHeight / 800)
+            var rise = Math.min(1.4, 0.18 + maxHeight / 700)
             cam -= rise
             for (var k = 0; k < platforms.length; k++)
                 platforms[k].y += rise
             py += rise
         }
 
-        platforms = platforms.filter(function (p) { return p.y < worldH + 40 })
-        while (platforms.length < 14) {
+        platforms = platforms.filter(function (p) { return p.y < worldH + 80 })
+        var minCount = Math.max(16, Math.round(worldH / 55))
+        while (platforms.length < minCount) {
             var top = platforms[0].y
             for (var t = 1; t < platforms.length; t++) {
                 if (platforms[t].y < top)
                     top = platforms[t].y
             }
-            platforms.push(randomPlatform(top - (70 + Math.random() * 40)))
+            var gap = Math.max(70, Math.min(110, worldH * 0.10))
+            platforms.push(randomPlatform(top - (gap * (0.85 + Math.random() * 0.35))))
         }
         platformsChanged()
 
-        if (py > worldH + 40) {
+        if (py > worldH + 60) {
             phase = "over"
             if (score > best)
                 best = score
@@ -133,7 +171,12 @@ Item {
         canvas.requestPaint()
     }
 
-    Component.onCompleted: resetWorld()
+    onWidthChanged: syncWorldSize()
+    onHeightChanged: syncWorldSize()
+    Component.onCompleted: {
+        syncWorldSize()
+        resetWorld()
+    }
 
     focus: true
     activeFocusOnTab: true
@@ -164,11 +207,9 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: 14
         color: "#5f7881"
         clip: true
 
-        // Focus grab sits UNDER the overlay/button so it cannot steal clicks.
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
@@ -178,12 +219,11 @@ Item {
         Canvas {
             id: canvas
             anchors.fill: parent
-            // Let presses fall through to the focus MouseArea / overlay button.
             enabled: false
             onPaint: {
                 var ctx = getContext("2d")
-                var sx = width / root.worldW
-                var sy = height / root.worldH
+                var sx = width / Math.max(1, root.worldW)
+                var sy = height / Math.max(1, root.worldH)
                 ctx.reset()
                 ctx.scale(sx, sy)
                 var g = ctx.createLinearGradient(0, 0, 0, root.worldH)
@@ -193,13 +233,14 @@ Item {
                 ctx.fillRect(0, 0, root.worldW, root.worldH)
 
                 ctx.fillStyle = "rgba(255,255,255,0.04)"
-                for (var x = 0; x < root.worldW; x += 48)
+                var stepX = Math.max(40, root.worldW / 18)
+                for (var x = 0; x < root.worldW; x += stepX)
                     ctx.fillRect(x, 0, 1, root.worldH)
 
                 for (var i = 0; i < root.platforms.length; i++) {
                     var p = root.platforms[i]
                     ctx.fillStyle = "#f7fafb"
-                    ctx.fillRect(p.x, p.y, p.w, 10)
+                    ctx.fillRect(p.x, p.y, p.w, root.platformH)
                 }
             }
         }
@@ -209,8 +250,8 @@ Item {
             source: "player-lambda.png"
             width: root.playerSize + 8
             height: root.playerSize + 8
-            x: root.px * (parent.width / root.worldW) - 4
-            y: root.py * (parent.height / root.worldH) - 4
+            x: root.px * (parent.width / Math.max(1, root.worldW)) - 4
+            y: root.py * (parent.height / Math.max(1, root.worldH)) - 4
             smooth: true
             visible: root.phase === "playing" || root.phase === "ready"
         }
@@ -219,24 +260,25 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.margins: 12
+            anchors.topMargin: Math.max(12, root.topSafe + 8)
+            anchors.leftMargin: 16
+            anchors.rightMargin: 16
             z: 1
             Text {
                 text: "HEIGHT " + root.score
                 color: "white"
                 font.bold: true
-                font.pixelSize: 12
+                font.pixelSize: 14
             }
-            Item { width: parent.width - 160; height: 1 }
+            Item { width: parent.width - 200; height: 1 }
             Text {
                 text: "BEST " + Math.max(root.best, root.score)
                 color: "white"
                 font.bold: true
-                font.pixelSize: 12
+                font.pixelSize: 14
             }
         }
 
-        // Ready / game-over overlay — above focus MouseArea so Play/Again works.
         Rectangle {
             anchors.fill: parent
             z: 2
@@ -245,14 +287,14 @@ Item {
 
             Column {
                 anchors.centerIn: parent
-                spacing: 12
-                width: parent.width - 48
+                spacing: 14
+                width: Math.min(420, parent.width - 64)
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.phase === "ready" ? "Logos Tower" : ("Fell at " + root.score)
                     color: "white"
-                    font.pixelSize: 26
+                    font.pixelSize: 32
                     font.bold: true
                 }
                 Text {
@@ -260,17 +302,17 @@ Item {
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
                     color: "#dfe8eb"
+                    font.pixelSize: 15
                     text: root.phase === "ready"
                           ? "Jump the rising platforms. ← → or A D. Space to start."
                           : "Height is signed before it hits the board."
                 }
 
-                // Forumer-style button (Rectangle + MouseArea), not Controls Button.
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: 96
-                    height: 36
-                    radius: 16
+                    width: 112
+                    height: 40
+                    radius: 18
                     color: "white"
 
                     Text {
@@ -278,6 +320,7 @@ Item {
                         text: root.phase === "ready" ? "Play" : "Again"
                         color: "#4F6670"
                         font.bold: true
+                        font.pixelSize: 15
                     }
                     MouseArea {
                         anchors.fill: parent

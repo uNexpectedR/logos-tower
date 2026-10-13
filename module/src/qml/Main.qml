@@ -4,9 +4,10 @@ import QtQuick.Layouts
 
 Item {
     id: root
-    // Preferred size for Basecamp's QQuickWidget host (storage_ui pattern).
-    implicitWidth: 420
-    implicitHeight: 720
+    // Prefer a large dock; Basecamp's QQuickWidget still sizes us to the host.
+    implicitWidth: 1100
+    implicitHeight: 800
+    anchors.fill: parent
 
     readonly property var backend: logos.module("logos_tower")
     property bool ready: false
@@ -15,6 +16,7 @@ Item {
 
     readonly property color teal: "#6A838B"
     readonly property color tealDeep: "#4F6670"
+    readonly property int chromeH: 48
 
     Connections {
         target: logos
@@ -29,21 +31,24 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: root.teal }
-            GradientStop { position: 1.0; color: root.tealDeep }
-        }
+        color: root.tealDeep
     }
 
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 16
-        spacing: 12
+    // Compact floating chrome — does not shrink the playfield.
+    Rectangle {
+        id: chrome
+        z: 10
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: root.chromeH
+        color: Qt.rgba(0.12, 0.18, 0.20, root.tab === "play" ? 0.55 : 0.92)
 
         RowLayout {
-            Layout.fillWidth: true
+            anchors.fill: parent
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
             spacing: 10
-            z: 2
 
             Image {
                 source: "lambda.png"
@@ -55,13 +60,17 @@ Item {
             Text {
                 text: "Logos Tower"
                 color: "white"
-                font.pixelSize: 20
+                font.pixelSize: 16
                 font.bold: true
+            }
+            Text {
+                visible: !root.ready
+                text: "Connecting…"
+                color: "#ffd39a"
+                font.pixelSize: 12
             }
             Item { Layout.fillWidth: true }
 
-            // Forumer-style hit targets: Rectangle + MouseArea (not Controls Button
-            // with replaced background/contentItem, which can end up zero-sized).
             Repeater {
                 model: [
                     { key: "play", label: "Play" },
@@ -72,19 +81,19 @@ Item {
                     required property var modelData
                     readonly property bool selected: root.tab === modelData.key
 
-                    Layout.preferredHeight: 32
-                    Layout.preferredWidth: Math.max(64, label.implicitWidth + 28)
-                    radius: 14
+                    Layout.preferredHeight: 28
+                    Layout.preferredWidth: Math.max(56, tabLabel.implicitWidth + 22)
+                    radius: 12
                     color: selected ? Qt.rgba(1, 1, 1, 0.22) : "transparent"
                     border.width: selected ? 1 : 0
                     border.color: Qt.rgba(1, 1, 1, 0.35)
 
                     Text {
-                        id: label
+                        id: tabLabel
                         anchors.centerIn: parent
                         text: modelData.label
                         color: "white"
-                        font.pixelSize: 13
+                        font.pixelSize: 12
                         font.bold: selected
                     }
                     MouseArea {
@@ -95,41 +104,39 @@ Item {
                 }
             }
         }
+    }
 
-        Text {
-            visible: !root.ready
-            text: "Connecting to Logos Tower backend…"
-            color: "#ffd39a"
-        }
+    StackLayout {
+        anchors.fill: parent
+        // Play uses the full window under a translucent chrome; other tabs pad below it.
+        anchors.topMargin: root.tab === "play" ? 0 : root.chromeH
+        currentIndex: root.tab === "login" ? 1 : (root.tab === "board" ? 2 : 0)
 
-        // Exclusive pages — avoids invisible siblings eating layout/hit space.
-        StackLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            currentIndex: root.tab === "login" ? 1 : (root.tab === "board" ? 2 : 0)
+        // —— Play (full-bleed) ——
+        Item {
+            clip: true
 
-            // —— Play ——
-            Item {
-                clip: true
-
-                GameCanvas {
-                    id: game
-                    anchors.centerIn: parent
-                    width: Math.min(parent.width, 380)
-                    height: Math.min(parent.height, 620)
-                    onFell: function (h) {
-                        if (!root.ready)
-                            return
-                        logos.watch(backend.signAndSubmit(h), function () {}, function (err) {
-                            console.log("submit error", err)
-                        })
-                    }
+            GameCanvas {
+                id: game
+                anchors.fill: parent
+                // Keep HUD / λ clear of the floating chrome.
+                topSafe: root.chromeH
+                onFell: function (h) {
+                    if (!root.ready)
+                        return
+                    logos.watch(backend.signAndSubmit(h), function () {}, function (err) {
+                        console.log("submit error", err)
+                    })
                 }
             }
+        }
 
-            // —— Login ——
+        // —— Login ——
+        Item {
             ColumnLayout {
-                spacing: 12
+                anchors.fill: parent
+                anchors.margins: 28
+                spacing: 14
 
                 Text {
                     text: "Login"
@@ -152,6 +159,7 @@ Item {
                 TextField {
                     id: aliasField
                     Layout.fillWidth: true
+                    Layout.maximumWidth: 520
                     Layout.preferredHeight: 40
                     placeholderText: "Display alias (optional)"
                     color: "white"
@@ -215,10 +223,14 @@ Item {
                 }
                 Item { Layout.fillHeight: true }
             }
+        }
 
-            // —— Board ——
+        // —— Board ——
+        Item {
             ColumnLayout {
-                spacing: 10
+                anchors.fill: parent
+                anchors.margins: 28
+                spacing: 12
 
                 Text {
                     text: "Leaderboard"
