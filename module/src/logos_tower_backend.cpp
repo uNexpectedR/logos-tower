@@ -22,7 +22,10 @@ const char kCrockford[] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 QString jsonString(const QString &s)
 {
-    return QString::fromUtf8(QJsonDocument(QJsonValue(s)).toJson(QJsonDocument::Compact));
+    QJsonArray arr;
+    arr.append(s);
+    const QByteArray raw = QJsonDocument(arr).toJson(QJsonDocument::Compact); // ["…"]
+    return QString::fromUtf8(raw.mid(1, raw.size() - 2));
 }
 } // namespace
 
