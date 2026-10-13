@@ -4,10 +4,9 @@ import QtQuick.Layouts
 
 Item {
     id: root
-    // Prefer a large dock; Basecamp's QQuickWidget still sizes us to the host.
+    // Prefer a large dock; Basecamp QQuickWidget uses SizeRootObjectToView.
     implicitWidth: 1100
     implicitHeight: 800
-    anchors.fill: parent
 
     readonly property var backend: logos.module("logos_tower")
     property bool ready: false
