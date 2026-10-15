@@ -29,7 +29,9 @@ Item {
     readonly property real friction: 0.86
     readonly property real maxVx: 11.5
     readonly property real wallRestitution: 0.94
+    // Collision box stays modest; drawn λ is a bit larger (noticeable, not huge).
     readonly property int playerSize: 44
+    readonly property int playerVisualSize: 62
     readonly property int platformH: 14
     readonly property real landSlopY: 5
     readonly property real landSlopX: 3
