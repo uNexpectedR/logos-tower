@@ -1,0 +1,48 @@
+name: Board sync snapshot
+
+# Short job: query logos.dev via the Next.js API code path and refresh
+# board.json even when the long-lived tunnel workflow is between runs.
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Fetch board via Next start
+        run: |
+          npm start > next.log 2>&1 &
+          echo $! > next.pid
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:3000/api/scores -o board.json; then
+              echo "got board"
+              kill "$(cat next.pid)" || true
+              exit 0
+            fi
+            sleep 2
+          done
+          cat next.log >&2 || true
+          exit 1
+      - name: Publish board.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view board >/dev/null 2>&1; then
+            gh release create board --title "Logos Tower public board" --notes "Rolling public board for Basecamp." --latest=false
+          fi
+          # Keep any existing relay.json; only refresh the snapshot.
+          gh release upload board board.json --clobber

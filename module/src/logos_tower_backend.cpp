@@ -244,7 +244,9 @@ QString LogosTowerBackend::refreshBoard()
         const QJsonObject relay = QJsonDocument::fromJson(relayPtr).object();
         const QString base = relay.value(QStringLiteral("url")).toString();
         if (base.startsWith(QStringLiteral("https://"))) {
-            const QByteArray live = httpGet(QUrl(base + QStringLiteral("/board")), 15000);
+            const QString boardPath = relay.value(QStringLiteral("boardPath")).toString(
+                QStringLiteral("/api/scores"));
+            const QByteArray live = httpGet(QUrl(base + boardPath), 15000);
             if (!live.isEmpty()) {
                 const QJsonObject obj = QJsonDocument::fromJson(live).object();
                 QJsonArray scores = obj.value(QStringLiteral("scores")).toArray();
@@ -293,10 +295,11 @@ QString LogosTowerBackend::publishWire(const QString &wireB64)
     const QString base = relay.value(QStringLiteral("url")).toString();
     if (!base.startsWith(QStringLiteral("https://")))
         return QStringLiteral("no-relay");
+    const QString scoresPath = relay.value(QStringLiteral("scoresPath")).toString(
+        QStringLiteral("/api/scores"));
     const QByteArray payload =
         QJsonDocument(QJsonObject{{QStringLiteral("wire"), wireB64}}).toJson(QJsonDocument::Compact);
-    const QByteArray resp =
-        httpPostJson(QUrl(base + QStringLiteral("/scores")), payload, 25000);
+    const QByteArray resp = httpPostJson(QUrl(base + scoresPath), payload, 25000);
     if (resp.isEmpty())
         return QStringLiteral("publish-failed");
     const QJsonObject obj = QJsonDocument::fromJson(resp).object();
