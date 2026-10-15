@@ -692,10 +692,13 @@ Item {
         Image {
             id: lambda
             source: "player-lambda.png"
-            width: root.playerSize + 8
-            height: root.playerSize + 8
-            x: root.px * (parent.width / Math.max(1, root.worldW)) - 4
-            y: root.py * (parent.height / Math.max(1, root.worldH)) - 4
+            // Visual scale above the collision box; centered so landings stay fair.
+            width: root.playerVisualSize * (parent.width / Math.max(1, root.worldW))
+            height: root.playerVisualSize * (parent.height / Math.max(1, root.worldH))
+            x: (root.px + (root.playerSize - root.playerVisualSize) / 2)
+               * (parent.width / Math.max(1, root.worldW))
+            y: (root.py + (root.playerSize - root.playerVisualSize) / 2)
+               * (parent.height / Math.max(1, root.worldH))
             smooth: true
             visible: root.phase === "playing" || root.phase === "ready"
         }
