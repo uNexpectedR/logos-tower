@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "repositoryName": "logos-tower",
+  "generatedAt": "2026-10-13T09:50:10Z",
+  "packages": [
+    {
+      "name": "logos_tower",
+      "versions": [
+        {
+          "releasedAt": "2026-10-13T09:50:10Z",
+          "publisherRef": "logos_tower-v0.1.0",
+          "url": "https://github.com/uNexpectedR/logos-tower/releases/download/logos_tower-v0.1.0/logos_tower-0.1.0.lgx",
+          "urls": [
+            "https://github.com/uNexpectedR/logos-tower/releases/download/logos_tower-v0.1.0/logos_tower-0.1.0.lgx"
+          ],
+          "size": 4157982,
+          "sha256": "2afe47ad1b0cd65ffc6c18a7758341f7c05e91dc79ddfc6e4b2d999dc5bd6623",
+          "rootHash": "dcf68daba1f3910716e8a09da7df6e0a7322faf4440932fd499e5f9c27ef8696",
+          "icon": {
+            "path": "ba1ee01b8114ea3686eac45e1d7e244b8e3d54adf2f284fb55948cfa87f2c631.png",
+            "sha256": "ba1ee01b8114ea3686eac45e1d7e244b8e3d54adf2f284fb55948cfa87f2c631",
+            "size": 7111
+          },
+          "manifest": {
+            "author": "",
+            "category": "social",
+            "dependencies": [],
+            "description": "Vertical jumper with the Logos \u03bb. Ed25519 persona login and signed height scores (BLAKE2b PoW). Open source.",
+            "display_name": "Logos Tower",
+            "hashes": {
+              "assets": "261a660e4b3ec879ceac431eb015260a733db975774cbb84a033e09b2db12deb",
+              "root": "dcf68daba1f3910716e8a09da7df6e0a7322faf4440932fd499e5f9c27ef8696",
+              "variants": "1a8b1eb2199e447d80cc1b4cc7bbf7e0922591c43e2474b3cfa1e05fd11dafb8",
+              "variants/linux-amd64": "cabb4842af44a87a9cc53e0756a04a1cbba39bcf82ffb33d689ba340721f94f1"
+            },
+            "icon": "assets/icon.png",
+            "main": {
+              "linux-amd64": "logos_tower_plugin.so"
+            },
+            "manifestVersion": "0.6.0",
+            "name": "logos_tower",
+            "type": "ui_qml",
+            "version": "0.1.0",
+            "view": "qml/Main.qml"
+          }
+        }
+      ]
+    }
+  ]
+}

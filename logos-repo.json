@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "logos-tower",
+  "displayName": "Logos Tower",
+  "description": "Logos Tower for Basecamp \u2014 install logos_tower (vertical jumper).",
+  "homepage": "https://github.com/uNexpectedR/logos-tower",
+  "indexUrl": "https://github.com/uNexpectedR/logos-tower/releases/download/index/index.json",
+  "trustedSigners": []
+}

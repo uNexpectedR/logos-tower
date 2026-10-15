@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+data/*.json
+!.gitkeep
+.env*
+.DS_Store
+*.log
+dist
+result-lgx
