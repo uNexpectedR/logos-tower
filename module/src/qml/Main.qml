@@ -16,6 +16,7 @@ Item {
     readonly property color teal: "#6A838B"
     readonly property color tealDeep: "#4F6670"
     readonly property int chromeH: 48
+    readonly property bool loggedIn: !!(backend && backend.loggedIn)
 
     Connections {
         target: logos
@@ -26,6 +27,12 @@ Item {
     }
     Component.onCompleted: {
         root.ready = root.backend !== null && logos.isViewModuleReady("logos_tower")
+    }
+
+    // Refresh public board when opening Board.
+    onTabChanged: {
+        if (tab === "board" && root.ready)
+            logos.watch(backend.refreshBoard(), function () {}, function () {})
     }
 
     Rectangle {
@@ -71,14 +78,17 @@ Item {
             Item { Layout.fillWidth: true }
 
             Repeater {
-                model: [
-                    { key: "play", label: "Play" },
-                    { key: "login", label: "Login" },
-                    { key: "board", label: "Board" }
-                ]
+                // Keep keys stable; label for login reacts to loggedIn.
+                model: ["play", "login", "board"]
                 delegate: Rectangle {
-                    required property var modelData
-                    readonly property bool selected: root.tab === modelData.key
+                    required property string modelData
+                    readonly property string tabKey: modelData
+                    readonly property string tabLabelText: tabKey === "play"
+                                                          ? "Play"
+                                                          : (tabKey === "board"
+                                                             ? "Board"
+                                                             : (root.loggedIn ? "Profile" : "Login"))
+                    readonly property bool selected: root.tab === tabKey
 
                     Layout.preferredHeight: 28
                     Layout.preferredWidth: Math.max(56, tabLabel.implicitWidth + 22)
@@ -90,7 +100,7 @@ Item {
                     Text {
                         id: tabLabel
                         anchors.centerIn: parent
-                        text: modelData.label
+                        text: tabLabelText
                         color: "white"
                         font.pixelSize: 12
                         font.bold: selected
@@ -98,7 +108,7 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.tab = modelData.key
+                        onClicked: root.tab = tabKey
                     }
                 }
             }
@@ -130,7 +140,7 @@ Item {
             }
         }
 
-        // —— Login ——
+        // —— Login / Profile ——
         Item {
             ColumnLayout {
                 anchors.fill: parent
@@ -138,7 +148,7 @@ Item {
                 spacing: 14
 
                 Text {
-                    text: "Login"
+                    text: root.loggedIn ? "Profile" : "Login"
                     color: "white"
                     font.pixelSize: 28
                     font.bold: true
@@ -147,10 +157,13 @@ Item {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     color: Qt.rgba(1, 1, 1, 0.82)
-                    text: "Ed25519 persona seed stays in this Basecamp profile (QSettings). Scores are signed here with BLAKE2b PoW — the board never trusts a raw height."
+                    text: root.loggedIn
+                          ? "Signed in on this Basecamp profile. Heights are Ed25519-signed with BLAKE2b PoW before they hit the public board."
+                          : "Ed25519 persona seed stays in this Basecamp profile (QSettings). Scores are signed here with BLAKE2b PoW — the board never trusts a raw height."
                 }
                 Text {
-                    text: "Persona: " + (backend ? backend.persona : "—")
+                    text: (root.loggedIn ? "Signed in as " : "Persona: ")
+                          + (backend ? backend.persona : "—")
                     color: "white"
                     font.pixelSize: 16
                     font.bold: true
@@ -182,7 +195,7 @@ Item {
                         Text {
                             id: saveLabel
                             anchors.centerIn: parent
-                            text: "Save / create persona"
+                            text: root.loggedIn ? "Update alias" : "Save / create persona"
                             color: root.tealDeep
                             font.bold: true
                         }
@@ -195,10 +208,13 @@ Item {
                     }
 
                     Rectangle {
+                        visible: root.loggedIn
                         Layout.preferredHeight: 36
                         Layout.preferredWidth: logoutLabel.implicitWidth + 20
                         radius: 16
                         color: "transparent"
+                        border.width: 1
+                        border.color: Qt.rgba(1, 1, 1, 0.35)
 
                         Text {
                             id: logoutLabel
@@ -231,17 +247,43 @@ Item {
                 anchors.margins: 28
                 spacing: 12
 
-                Text {
-                    text: "Leaderboard"
-                    color: "white"
-                    font.pixelSize: 28
-                    font.bold: true
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        text: "Leaderboard"
+                        color: "white"
+                        font.pixelSize: 28
+                        font.bold: true
+                        Layout.fillWidth: true
+                    }
+                    Rectangle {
+                        Layout.preferredHeight: 32
+                        Layout.preferredWidth: refreshLabel.implicitWidth + 24
+                        radius: 14
+                        color: Qt.rgba(1, 1, 1, 0.14)
+                        Text {
+                            id: refreshLabel
+                            anchors.centerIn: parent
+                            text: "Refresh"
+                            color: "white"
+                            font.bold: true
+                            font.pixelSize: 12
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: root.ready
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: logos.watch(backend.refreshBoard(), function () {}, function () {})
+                        }
+                    }
                 }
                 Text {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     color: Qt.rgba(1, 1, 1, 0.8)
-                    text: "Best verified signed heights on this device. Envelope: Ed25519 + BLAKE2b PoW (12 bits)."
+                    text: "Public verified heights (logos.dev Waku). Source: "
+                          + (backend ? backend.boardSource : "local")
+                          + ". Envelope: Ed25519 + BLAKE2b PoW (12 bits)."
                 }
                 ListView {
                     Layout.fillWidth: true

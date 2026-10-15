@@ -1,11 +1,11 @@
 {
   "name": "logos_tower",
   "display_name": "Logos Tower",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "type": "ui_qml",
   "interface": "universal",
   "category": "social",
-  "description": "Vertical jumper with the Logos λ. Ed25519 persona login and signed height scores (BLAKE2b PoW). Open source.",
+  "description": "Vertical jumper with the Logos λ. Ed25519 persona login and signed height scores (BLAKE2b PoW) on logos.dev. Open source.",
   "main": "logos_tower_plugin",
   "icon": "src/icons/icon.png",
   "view": "qml/Main.qml",
@@ -25,7 +25,7 @@
       "find_packages": [],
       "extra_sources": [],
       "extra_include_dirs": [],
-      "extra_link_libraries": []
+      "extra_link_libraries": ["Qt6::Network"]
     }
   }
 }

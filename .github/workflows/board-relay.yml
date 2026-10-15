@@ -1,0 +1,97 @@
+name: Board relay (logos.dev)
+
+# Keeps a public board.json snapshot and a short-lived HTTPS relay URL so
+# Basecamp clients can fetch/publish verified scores without embedding secrets.
+# Tunnel runs ~3h45m; schedule every 4h for near-continuous coverage.
+
+on:
+  schedule:
+    - cron: "5 */4 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: board-relay
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 225
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Install cloudflared
+        run: |
+          curl -fsSL -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x cloudflared
+
+      - name: Start board relay
+        run: |
+          npx --yes tsx scripts/board-relay.mjs > relay.log 2>&1 &
+          echo $! > relay.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8787/health >/dev/null; then
+              echo "relay up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "relay failed to start" >&2
+          cat relay.log >&2 || true
+          exit 1
+
+      - name: Open Cloudflare quick tunnel
+        run: |
+          ./cloudflared tunnel --url http://127.0.0.1:8787 > tunnel.log 2>&1 &
+          echo $! > tunnel.pid
+          for i in $(seq 1 60); do
+            url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' tunnel.log | head -1 || true)
+            if [ -n "$url" ]; then
+              echo "RELAY_URL=$url" >> "$GITHUB_ENV"
+              echo "tunnel url: $url"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "tunnel URL not found" >&2
+          cat tunnel.log >&2 || true
+          exit 1
+
+      - name: Snapshot board + publish relay pointer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fsS http://127.0.0.1:8787/board -o board.json
+          jq -n --arg url "$RELAY_URL" --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{url:$url, boardPath:"/board", scoresPath:"/scores", updatedAt:$updated}' > relay.json
+          if ! gh release view board >/dev/null 2>&1; then
+            gh release create board --title "Logos Tower public board" --notes "Rolling public board + relay pointer for Basecamp." --latest=false
+          fi
+          gh release upload board board.json relay.json --clobber
+
+      - name: Keep relay alive
+        run: |
+          # Refresh board.json periodically while the tunnel stays up.
+          end=$((SECONDS + 210 * 60))
+          while [ $SECONDS -lt $end ]; do
+            sleep 300
+            if ! kill -0 "$(cat relay.pid)" 2>/dev/null; then
+              echo "relay died" >&2
+              cat relay.log >&2 || true
+              exit 1
+            fi
+            curl -fsS http://127.0.0.1:8787/board -o board.json || true
+            GH_TOKEN=${{ github.token }} gh release upload board board.json --clobber || true
+          done

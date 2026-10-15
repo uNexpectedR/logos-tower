@@ -27,10 +27,10 @@ https://github.com/uNexpectedR/logos-tower/releases/download/index/index.json
 | | |
 | --- | --- |
 | Package id | `logos_tower` |
-| Version | `0.1.10` |
+| Version | `0.1.11` |
 | Variants | `darwin-arm64`, `linux-amd64` |
 | Category | `social` |
-| Release | https://github.com/uNexpectedR/logos-tower/releases/tag/logos_tower-v0.1.10 |
+| Release | https://github.com/uNexpectedR/logos-tower/releases/tag/logos_tower-v0.1.11 |
 
 **macOS note:** Apple Silicon Basecamp expects `darwin-arm64`. Intel Mac (`darwin-amd64`) is not in this release yet.
 

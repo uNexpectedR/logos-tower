@@ -61,8 +61,10 @@ Native install for Logos Basecamp (desktop). Source: [uNexpectedR/logos-tower](h
 | | |
 | --- | --- |
 | Package | `logos_tower` |
-| Version | `0.1.10` |
+| Version | `0.1.11` |
 | Platforms | `darwin-arm64`, `linux-amd64` |
 | Category | Social |
+
+After login the chrome shows **Profile** (alias / fingerprint + log out). **Board** is the public logos.dev leaderboard (signed scores); use Refresh if the relay was briefly offline.
 
 Threat model and extra notes: [BASECAMP.md](./BASECAMP.md).
