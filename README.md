@@ -44,12 +44,25 @@ npm run lint
 
 Muted slate-teal `#6A838B` + white λ (`public/logos-lambda.png`).
 
-## Basecamp
+## Basecamp install
 
-**Catalog URL** (Package Repositories) — GitHub Releases, not raw branch:
+Native install for Logos Basecamp (desktop). Source: [uNexpectedR/logos-tower](https://github.com/uNexpectedR/logos-tower).
 
-```
-https://github.com/uNexpectedR/logos-tower/releases/download/index/logos-repo.json
-```
+1. Open **Basecamp → Settings → Package Repositories**.
+2. Add this catalog URL:
 
-Install package **`logos_tower` `0.1.10`** (`darwin-arm64` / `linux-amd64`, category Social), then open **Logos Tower** from the Basecamp sidebar. Details and threat model: [BASECAMP.md](./BASECAMP.md).
+   ```
+   https://github.com/uNexpectedR/logos-tower/releases/download/index/logos-repo.json
+   ```
+
+3. Open **Package Monitor** (or Package Manager) → **Social** → install **`logos_tower`**.
+4. Open **Logos Tower** from the Basecamp sidebar.
+
+| | |
+| --- | --- |
+| Package | `logos_tower` |
+| Version | `0.1.10` |
+| Platforms | `darwin-arm64`, `linux-amd64` |
+| Category | Social |
+
+Threat model and extra notes: [BASECAMP.md](./BASECAMP.md).
