@@ -61,7 +61,7 @@ Native install for Logos Basecamp (desktop). Source: [uNexpectedR/logos-tower](h
 | | |
 | --- | --- |
 | Package | `logos_tower` |
-| Version | `0.1.11` |
+| Version | `0.1.12` |
 | Platforms | `darwin-arm64`, `linux-amd64` |
 | Category | Social |
 

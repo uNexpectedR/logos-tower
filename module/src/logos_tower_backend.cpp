@@ -187,7 +187,7 @@ void LogosTowerBackend::mergeRemoteScores(const QJsonArray &remote)
 QByteArray LogosTowerBackend::httpGet(const QUrl &url, int timeoutMs)
 {
     QNetworkRequest req(url);
-    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("logos_tower/0.1.11"));
+    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("logos_tower/0.1.12"));
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                      QNetworkRequest::NoLessSafeRedirectPolicy);
     QNetworkReply *reply = m_nam.get(req);
@@ -212,7 +212,7 @@ QByteArray LogosTowerBackend::httpGet(const QUrl &url, int timeoutMs)
 QByteArray LogosTowerBackend::httpPostJson(const QUrl &url, const QByteArray &json, int timeoutMs)
 {
     QNetworkRequest req(url);
-    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("logos_tower/0.1.11"));
+    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("logos_tower/0.1.12"));
     req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                      QNetworkRequest::NoLessSafeRedirectPolicy);
